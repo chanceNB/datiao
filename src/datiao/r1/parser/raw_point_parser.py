@@ -13,6 +13,8 @@ from ..models.immutable import freeze_json
 from ..stroke.quality import (
     DUPLICATE_POINT,
     INVALID_COORDINATE,
+    MISSING_PAGE,
+    MISSING_SEQUENCE,
     MISSING_TIMESTAMP,
     OUT_OF_ORDER,
 )
@@ -79,14 +81,16 @@ def parse_raw_points(records: Iterable[Mapping[str, Any]]) -> tuple[Point, ...]:
         if not isinstance(record, Mapping):
             raise TypeError("each raw point record must be a mapping")
 
-        point_id = record.get("point_id") or f"point-{raw_index:06d}"
-        session_id = record.get("session_id") or "unknown-session"
+        if record.get("point_id") in (None, ""):
+            raise ValueError(f"record {raw_index} is missing canonical field: point_id")
+        if record.get("session_id") in (None, ""):
+            raise ValueError(f"record {raw_index} is missing canonical field: session_id")
+        point_id = record["point_id"]
+        session_id = record["session_id"]
         page_id = record.get("page_id")
         x = _as_coordinate(_nested_value(record, "x"))
         y = _as_coordinate(_nested_value(record, "y"))
         timestamp_value = _nested_value(record, "timestamp_ms")
-        if timestamp_value is None:
-            timestamp_value = record.get("timestamp")
         timestamp_ms = _as_timestamp(timestamp_value)
         flags: list[str] = []
 
@@ -94,10 +98,14 @@ def parse_raw_points(records: Iterable[Mapping[str, Any]]) -> tuple[Point, ...]:
             flags.append(INVALID_COORDINATE)
         if timestamp_ms is None:
             flags.append(MISSING_TIMESTAMP)
+        if page_id in (None, ""):
+            flags.append(MISSING_PAGE)
         if point_id in duplicate_ids:
             flags.append(DUPLICATE_POINT)
 
         sequence = _sequence(record)
+        if sequence is None:
+            flags.append(MISSING_SEQUENCE)
         group_key = (session_id, page_id)
         previous_sequence = previous_sequences.get(group_key)
         if sequence is not None and previous_sequence is not None and sequence < previous_sequence:

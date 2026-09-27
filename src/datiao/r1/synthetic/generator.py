@@ -42,6 +42,10 @@ def _action_plan(scenario: Scenario) -> tuple[_Action, ...]:
         "revision_candidate": (q1, q1),
         "cross_question_jump": (q1, q3),
         "page_change": (q1, page2),
+        "unknown_page": (
+            q1,
+            _Action("page-unknown", None, 5.0, 5.0, expected_unknown=True),
+        ),
         "pause_resume": (q1, q1),
         "unknown_region": (
             q1,

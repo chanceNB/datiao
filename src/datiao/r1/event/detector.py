@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from ..mapper import StrokeMapping
 from ..models import StudentProcessEvent
@@ -14,6 +15,9 @@ def detect_student_process_events(
     mappings: Iterable[StrokeMapping],
     *,
     schema_version: str = PROCESS_SCHEMA_VERSION,
+    task_segment_id: str | None = None,
+    data_version: str | None = None,
+    source_provenance: Mapping[str, Any] | None = None,
 ) -> tuple[StudentProcessEvent, ...]:
     """Convert ordered stroke mappings into observable process events."""
 
@@ -59,6 +63,9 @@ def detect_student_process_events(
                 event_id=f"{session_id}:event:{sequence:04d}",
                 schema_version=schema_version,
                 session_id=session_id,
+                task_segment_id=task_segment_id,
+                data_version=data_version,
+                source_provenance=source_provenance or {},
                 event_type=event_type,
                 sequence=sequence,
                 occurred_at_ms=(

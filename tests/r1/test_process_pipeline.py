@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from datiao.r1.event import detect_student_process_events
 from datiao.r1.mapper import StrokeMapping, map_strokes_to_regions
 from datiao.r1.models import QuestionRegion
+from datiao.r1.pipeline import run_r1_pipeline
 from datiao.r1.parser import (
     CanonicalPointAdapterError,
     adapt_canonical_records,
@@ -11,6 +12,11 @@ from datiao.r1.parser import (
 )
 from datiao.r1.stroke import StrokeBuildConfig, build_strokes
 from datiao.r1.trace import TraceResolutionError, resolve_event_trace, resolve_event_traces
+from datiao.r1.verification import (
+    apply_verification_label,
+    build_verification_template,
+    summarize_verification,
+)
 
 
 def record(point_id, timestamp_ms, x, y, *, session_id="s-1", page_id="p-1", sequence=0):
@@ -186,3 +192,84 @@ def test_question_region_validates_geometry():
     )
     assert polygon.contains(5.0, 5.0)
     assert not polygon.contains(0.0, 11.0)
+
+
+def test_unified_pipeline_propagates_contract_fields_and_trace():
+    records = (
+        record("p-1", 1_000, 2.0, 2.0, sequence=0),
+        record("p-2", 1_050, 3.0, 3.0, sequence=1),
+    )
+    result = run_r1_pipeline(
+        records,
+        (region("r-q1", "q1"),),
+        "s-1",
+        task_segment_id="segment-7",
+        data_version="points-v2",
+        source_provenance={"fixture": "pipeline"},
+    )
+
+    assert result.quality_status == "OK"
+    assert result.points and result.strokes and result.stroke_mappings
+    assert [event.event_type for event in result.student_process_events] == [
+        "QUESTION_VISIT",
+        "PROCESS_END",
+    ]
+    assert all(event.task_segment_id == "segment-7" for event in result.student_process_events)
+    assert all(event.data_version == "points-v2" for event in result.student_process_events)
+    assert result.student_process_events[0].source_provenance["fixture"] == "pipeline"
+    assert len(result.event_traces) == len(result.student_process_events)
+    assert result.page_replay.frames[0].stroke_id == result.strokes[0].stroke_id
+
+
+def test_unified_pipeline_empty_input_is_invalid_but_replay_is_serializable():
+    result = run_r1_pipeline((), (), "s-empty")
+
+    assert result.quality_status == "INVALID"
+    assert result.quality_flags == ("EMPTY_INPUT",)
+    assert result.points == ()
+    assert result.page_replay.session_id == "s-empty"
+    assert result.page_replay.frames == ()
+
+
+def test_unified_pipeline_unknown_mapping_is_degraded_and_keeps_sources():
+    records = (
+        record("p-1", 1_000, 100.0, 100.0, sequence=0),
+        record("p-2", 1_050, 101.0, 101.0, sequence=1),
+    )
+    result = run_r1_pipeline(records, (region("r-q1", "q1"),), "s-1")
+
+    assert result.quality_status == "DEGRADED"
+    assert result.stroke_mappings[0].status == "UNKNOWN"
+    assert [event.event_type for event in result.student_process_events] == [
+        "UNKNOWN",
+        "PROCESS_END",
+    ]
+    assert result.student_process_events[0].source_point_ids == ("p-1", "p-2")
+
+
+def test_unified_pipeline_records_trace_failures_without_dropping_events():
+    records = (
+        record("p-1", 1_000, 2.0, 2.0, sequence=0),
+        record("p-1", 1_050, 3.0, 3.0, sequence=1),
+    )
+    result = run_r1_pipeline(records, (region("r-q1", "q1"),), "s-1")
+
+    assert result.quality_status == "DEGRADED"
+    assert "TRACE_ERROR" in result.quality_flags
+    assert result.trace_errors
+    assert result.student_process_events
+    assert not result.event_traces
+
+
+def test_manual_verification_defaults_uncertain_and_summarizes_labels():
+    result = run_r1_pipeline(
+        (record("p-1", 1_000, 2.0, 2.0, sequence=0),),
+        (region("r-q1", "q1"),),
+        "s-1",
+    )
+    template = build_verification_template(result.student_process_events)
+    assert template and all(row.label == "UNCERTAIN" for row in template)
+    labeled = apply_verification_label(template, template[0].event_id, "YES", reviewer="r4")
+    summary = summarize_verification(labeled)
+    assert summary.yes == 1
+    assert summary.uncertain == len(template) - 1

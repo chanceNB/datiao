@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from typing import Protocol
 from typing import Any
 
 CANONICAL_POINT_FIELDS = frozenset(
@@ -20,6 +21,20 @@ CANONICAL_POINT_FIELDS = frozenset(
 
 class CanonicalPointAdapterError(ValueError):
     """Raised when an input record is not explicitly canonicalized."""
+
+
+class PointRecordAdapter(Protocol):
+    """Interface for converting one device format into canonical records."""
+
+    def adapt(self, records: Iterable[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
+        ...
+
+
+class CanonicalPointAdapter:
+    """Adapter for records that already use the frozen canonical field names."""
+
+    def adapt(self, records: Iterable[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
+        return adapt_canonical_records(records)
 
 
 def adapt_canonical_records(

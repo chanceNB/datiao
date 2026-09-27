@@ -13,6 +13,8 @@
 - `resolve_event_trace()` 将事件中的 Stroke ID 和 Point ID 解析为实际对象，并拒绝缺失来源或跨场次来源。
 - `adapt_canonical_records()` 固定规范化字段，不猜测设备字段别名；设备字段需要单独适配器明确转换。
 - Synthetic 场景保存独立真值，同时运行实际 Mapping 和 Event Detection 输出。
+- `run_r1_pipeline()` 提供统一离线入口，串联规范化、解析、Stroke、映射、事件、页面回放和来源核验。
+- `PageReplay` 保存时间排序的点、Stroke、页面和质量来源；`ManualVerificationRecord` 使用 `YES / NO / UNCERTAIN`。
 
 ## 事件边界
 
@@ -22,7 +24,7 @@
 
 ## 仿真场景
 
-包含按序作答、跨题跳转、返回、重复书写、页面切换、暂停继续、未知题区、缺时间、重复点和乱序点。
+包含按序作答、跨题跳转、返回、重复书写、页面切换、未知页面、暂停继续、未知题区、缺时间、重复点和乱序点。
 
 ## 验收命令
 
@@ -30,12 +32,13 @@
 python -m pytest
 ```
 
-当前验收包括 31 个测试：既有 Point/Stroke 基线，也包括映射、事件顺序、独立真值、质量降级和 Evidence Trace。
+当前验收包括 39 个测试：既有 Point/Stroke 基线，也包括统一入口、映射、事件顺序、独立真值、质量降级、页面回放、人工核验和 Evidence Trace。
 
 ## 复现示例
 
 ```powershell
-python -c "import sys; sys.path.insert(0, 'src'); from datiao.r1.synthetic import Scenario, generate_synthetic_case; c=generate_synthetic_case(Scenario('demo-return','return_visit',7)); print([e.event_type for e in c.algorithm_output.events])"
+$env:PYTHONPATH = "src"
+python -c "from datiao.r1.synthetic import Scenario, generate_synthetic_case; c=generate_synthetic_case(Scenario('demo-return','return_visit',7)); print([e.event_type for e in c.algorithm_output.events])"
 ```
 
 输出应为：
@@ -49,3 +52,20 @@ python -c "import sys; sys.path.insert(0, 'src'); from datiao.r1.synthetic impor
 - 真实设备协议适配器；
 - 班级态势、后端服务和前端页面；
 - 视觉识别和心理状态推断。
+
+## 统一入口示例
+
+```python
+from datiao.r1 import run_r1_pipeline
+
+result = run_r1_pipeline(
+    canonical_records,
+    question_regions,
+    session_id="session-001",
+    task_segment_id="task-01",
+    data_version="canonical-v1",
+    source_provenance={"input_kind": "synthetic"},
+)
+```
+
+`result.quality_status` 为 `OK`、`DEGRADED` 或 `INVALID`。事件通过 `source_stroke_ids` 和 `source_point_ids` 回溯；`result.event_traces` 保存已通过核验的来源，`result.trace_errors` 保存失败原因。

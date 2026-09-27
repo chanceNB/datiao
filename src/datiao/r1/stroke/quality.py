@@ -8,6 +8,8 @@ from typing import Any
 from ..models.point import Point
 
 MISSING_TIMESTAMP = "MISSING_TIMESTAMP"
+MISSING_SEQUENCE = "MISSING_SEQUENCE"
+MISSING_PAGE = "MISSING_PAGE"
 INVALID_COORDINATE = "INVALID_COORDINATE"
 DUPLICATE_POINT = "DUPLICATE_POINT"
 OUT_OF_ORDER = "OUT_OF_ORDER"
@@ -16,7 +18,14 @@ INCOMPLETE = "INCOMPLETE"
 PARTIAL_DATA = "PARTIAL_DATA"
 
 POINT_QUALITY_FLAGS = frozenset(
-    {MISSING_TIMESTAMP, INVALID_COORDINATE, DUPLICATE_POINT, OUT_OF_ORDER}
+    {
+        MISSING_TIMESTAMP,
+        MISSING_SEQUENCE,
+        MISSING_PAGE,
+        INVALID_COORDINATE,
+        DUPLICATE_POINT,
+        OUT_OF_ORDER,
+    }
 )
 STROKE_QUALITY_FLAGS = frozenset({INCOMPLETE, PARTIAL_DATA})
 
@@ -39,7 +48,7 @@ def point_quality(point: Point) -> frozenset[str]:
 def stroke_quality_flags(points: tuple[Point, ...]) -> tuple[str, ...]:
     qualities = set().union(*(point_quality(point) for point in points))
     flags: list[str] = []
-    if qualities.intersection({MISSING_TIMESTAMP, INVALID_COORDINATE}):
+    if qualities.intersection({MISSING_TIMESTAMP, MISSING_SEQUENCE, MISSING_PAGE, INVALID_COORDINATE}):
         flags.append(INCOMPLETE)
     if qualities.intersection({DUPLICATE_POINT, OUT_OF_ORDER}):
         flags.append(PARTIAL_DATA)

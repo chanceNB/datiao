@@ -60,3 +60,27 @@ def test_parser_marks_sequence_out_of_order():
 
 def test_empty_input_returns_empty_tuple():
     assert parse_raw_points(()) == ()
+
+
+def test_missing_sequence_is_retained_as_quality_and_time_order_still_checked():
+    first = record("point-1", timestamp_ms=1200, sequence=0)
+    second = record("point-2", timestamp_ms=1100, sequence=0)
+    del first["sequence"]
+    del second["sequence"]
+
+    points = parse_raw_points((first, second))
+
+    assert all("MISSING_SEQUENCE" in point.quality_flags for point in points)
+    assert "OUT_OF_ORDER" in points[1].quality_flags
+
+
+def test_missing_identity_fields_are_explicit_errors():
+    source = record("point-1")
+    del source["point_id"]
+    with pytest.raises(ValueError, match="point_id"):
+        parse_raw_points((source,))
+
+    source = record("point-1")
+    del source["session_id"]
+    with pytest.raises(ValueError, match="session_id"):
+        parse_raw_points((source,))

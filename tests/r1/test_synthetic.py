@@ -16,6 +16,7 @@ def test_supported_scenarios_generate_raw_points_and_truth():
         "revision_candidate",
         "cross_question_jump",
         "page_change",
+        "unknown_page",
         "pause_resume",
         "unknown_region",
         "missing_point",

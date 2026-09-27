@@ -26,6 +26,9 @@ class StudentProcessEvent(BaseModel):
     event_id: str = Field(min_length=1)
     schema_version: str = Field(min_length=1)
     session_id: str = Field(min_length=1)
+    task_segment_id: str | None = None
+    data_version: str | None = None
+    source_provenance: Any = Field(default_factory=lambda: freeze_json({}))
     event_type: EventType
     sequence: int = Field(ge=0)
     occurred_at_ms: int | None = None
@@ -43,4 +46,9 @@ class StudentProcessEvent(BaseModel):
     @classmethod
     def validate_metadata(cls, value: Any) -> Any:
         reject_out_of_scope_fields(value)
+        return freeze_json(value)
+
+    @field_validator("source_provenance", mode="before")
+    @classmethod
+    def freeze_source_provenance(cls, value: Any) -> Any:
         return freeze_json(value)
