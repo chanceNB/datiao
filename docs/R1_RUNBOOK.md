@@ -9,7 +9,7 @@ $env:PYTHONPATH = "src"
 python -m pytest
 ```
 
-当前仓库全量测试以实际 pytest 输出为准；本任务完成时为 53 个。真实设备字段尚未冻结时，只能传入以下规范化字段：
+当前仓库全量测试以实际 pytest 输出为准；本任务完成时为 58 个。真实设备字段尚未冻结时，只能传入以下规范化字段：
 
 ```text
 point_id, session_id, page_id, timestamp_ms, x, y, sequence
@@ -78,6 +78,7 @@ $py = "C:\Users\ZhuanZ（无密码）\AppData\Local\Programs\Python\Python314\py
 & $py -m pytest tests/r1 -q
 & $py -m pytest
 ```
+
 
 
 
