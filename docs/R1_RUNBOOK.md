@@ -115,6 +115,10 @@ Truth 与 R1 rule prediction 分别写入 `truth_events.jsonl` 和 `predicted_ev
 Use python -m datiao.r1.features.builder --dataset artifacts/r1_synthetic_penprocess_v1 --output artifacts/r1_synthetic_features_v1 --config configs/r1_feature_builder_v1.json --overwrite; reload with datiao.r1.features.io.reload_feature_dataset. Expected materialization: 700 episodes and 360 sequences; source splits remain 490/105/105 episodes.
 
 R1-07-FIX-01 final feature manifest: sha256:40b0326baf0f71206da1fd14b05c8ab5bdf1473c708735c57c019ea820cf5848; alignment records are core hashed assets and runtime contracts load from contracts/r1_feature_schema_v1.json and r1_target_spec_v1.json.
+
+## R1-08-FIX-01 LightGBM reproducibility audit
+
+Run the baseline with the command in `docs/R1_TASK_R1_08.md`. The runner performs two independent executions and writes `audits/reproducibility.json`; inspect it together with `run_manifest.json` and `audits/model_reload.json`. Expected status is `PASS`, with equal prediction/metrics/run hashes and zero validation/test reload probability differences. `reload_lightgbm_run` verifies the manifest, frozen orders, source feature lineage, model hashes, predictions hash and metrics hash.
 # R1 LightGBM optional dependencies
 
 Install the fixed baseline dependencies with:

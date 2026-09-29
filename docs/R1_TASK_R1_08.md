@@ -24,3 +24,7 @@ python -m datiao.r1.lightgbm.train --features artifacts/r1_synthetic_features_v1
 - reproducibility audit：PASS，reloaded test probability max absolute diff=0.0
 
 这些指标仅描述 Synthetic Development Test，不能代表真实课堂或真实学生泛化性能；规则生成存在 shortcut risk。
+
+## TASK-R1-08-FIX-01 更新
+
+FIX-01 已完成复现与评估完整性修复。两次独立 full baseline 执行的 predictions、metrics、run hash 均一致；validation/test 每个 label 的模型重载概率最大绝对差均为 `0.0`。`reload_lightgbm_run` 现在校验 run manifest 自哈希、source Feature Manifest lineage、模型文件、predictions 和 metrics 的哈希，并覆盖篡改失败测试。指标直接从 source split 顺序矩阵计算，与 prediction JSONL 的序列化排序解耦；最终指标和上述三项最终 hash 未改变。详见 `docs/R1_TASK_R1_08_FIX_01.md`。
