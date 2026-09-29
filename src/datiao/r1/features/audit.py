@@ -44,7 +44,10 @@ def run_feature_range_audit(rows: Iterable[FeatureRow]) -> dict[str, Any]:
 def run_alignment_audit(records: Iterable[AlignmentRecord]) -> dict[str, Any]:
     records = tuple(records)
     counts = Counter(record.alignment_status for record in records)
+    aligned=sum(counts[k] for k in ("ONE_TO_ONE",))
     return {"status": "PASS" if not any(counts[key] for key in ("UNMATCHED", "AMBIGUOUS", "ONE_TO_MANY")) else "FAIL",
+            "truth_event_count": len(records), "aligned_truth_event_count": aligned,
+            "unmatched_truth_event_count": counts["UNMATCHED"], "ambiguous_truth_event_count": counts["AMBIGUOUS"]+counts["ONE_TO_MANY"],
             "record_count": len(records), "status_counts": dict(sorted(counts.items())),
             "unmatched": [r.truth_event_id for r in records if r.alignment_status == "UNMATCHED"],
             "ambiguous": [r.truth_event_id for r in records if r.alignment_status in {"AMBIGUOUS", "ONE_TO_MANY"}]}
