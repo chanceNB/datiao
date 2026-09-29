@@ -1,0 +1,1 @@
+{"title":"R1 Observation Episode","type":"object","required":["episode_id","case_id","stroke_id","split","point_refs"],"properties":{"episode_id":{"type":"string"},"case_id":{"type":"string"},"stroke_id":{"type":"string"},"split":{"enum":["train","validation","test"]},"point_refs":{"type":"array","items":{"type":"string"}}}}

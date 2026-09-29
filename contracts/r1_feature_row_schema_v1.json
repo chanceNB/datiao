@@ -1,0 +1,1 @@
+{"title":"R1 Feature Row","type":"object","required":["episode_id","split","features","target"],"properties":{"episode_id":{"type":"string"},"split":{"enum":["train","validation","test"]},"features":{"type":"object"},"target":{"type":"array","minItems":8,"maxItems":8}}}

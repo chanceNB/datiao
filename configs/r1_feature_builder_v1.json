@@ -1,0 +1,1 @@
+{"feature_dataset_id":"r1-synthetic-features-v1","feature_dataset_version":"1.0.0","feature_builder_version":"r1-feature-v1","feature_schema_version":"r1-feature-schema-v1","target_spec_version":"r1-event-multilabel-v1","truth_alignment_version":"r1-truth-align-v1","inside_pause_threshold_ms":500}

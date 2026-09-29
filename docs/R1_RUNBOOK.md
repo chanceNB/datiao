@@ -109,3 +109,7 @@ Truth 与 R1 rule prediction 分别写入 `truth_events.jsonl` 和 `predicted_ev
 
 
 
+
+## R1-07 Feature Builder
+
+Use python -m datiao.r1.features.builder --dataset artifacts/r1_synthetic_penprocess_v1 --output artifacts/r1_synthetic_features_v1 --config configs/r1_feature_builder_v1.json --overwrite; reload with datiao.r1.features.io.reload_feature_dataset. Expected materialization: 700 episodes and 360 sequences; source splits remain 490/105/105 episodes.

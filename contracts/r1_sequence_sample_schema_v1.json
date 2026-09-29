@@ -1,0 +1,1 @@
+{"title":"R1 Sequence Sample","type":"object","required":["sequence_id","case_id","episode_ids","values","feature_mask","targets"],"properties":{"sequence_id":{"type":"string"},"case_id":{"type":"string"},"episode_ids":{"type":"array"},"values":{"type":"array"},"feature_mask":{"type":"array"},"targets":{"type":"array"}}}
