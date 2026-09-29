@@ -63,7 +63,7 @@ def test_mapping_and_return_event_sequence_is_deterministic():
     )
 
     assert [mapping.question_id for mapping in mappings] == ["q1", "q2", "q1"]
-    events = detect_student_process_events(mappings)
+    events = detect_student_process_events(mappings, strokes=strokes, points=points)
 
     assert [event.event_type for event in events] == [
         "WRITING",
@@ -74,6 +74,7 @@ def test_mapping_and_return_event_sequence_is_deterministic():
         "WRITING",
         "QUESTION_LEAVE",
         "RETURN",
+        "REVISION_CANDIDATE",
     ]
     assert events[7].question_id == "q1"
     assert events[7].source_stroke_ids == (strokes[2].stroke_id,)
@@ -93,7 +94,7 @@ def test_page_change_and_unknown_mapping_are_explicit():
     assert mappings[1].question_id == "q3"
     assert mappings[2].status == "UNKNOWN"
     assert "NO_REGION_MATCH" in mappings[2].quality_flags
-    events = detect_student_process_events(mappings)
+    events = detect_student_process_events(mappings, strokes=strokes, points=points)
 
     assert [event.event_type for event in events] == [
         "WRITING",
@@ -116,7 +117,7 @@ def test_same_question_new_stroke_is_only_writing_without_revision_evidence():
         [("p-1", 2.0, 2.0), ("p-1", 2.0, 2.0)]
     )
 
-    events = detect_student_process_events(mappings)
+    events = detect_student_process_events(mappings, strokes=_strokes, points=_points)
     assert [event.event_type for event in events] == [
         "WRITING",
         "QUESTION_VISIT",

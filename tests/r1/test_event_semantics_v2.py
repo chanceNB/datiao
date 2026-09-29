@@ -30,7 +30,7 @@ def event_types(raw, *, config=None, end=False, session_end_ms=None):
 def test_writing_and_question_visit_are_both_emitted():
     result, types = event_types(records([(5, 5, 0)]))
     assert types == ["WRITING", "QUESTION_VISIT"]
-    assert result.student_process_events[0].algorithm_version == "r1-event-rule-v0.2"
+    assert result.student_process_events[0].algorithm_version == "r1-event-rule-v0.2.1"
 
 
 def test_normal_same_question_multistroke_is_not_revision():
@@ -75,4 +75,4 @@ def test_page_transition_is_a_question_leave_even_when_question_id_repeats():
         QuestionRegion(region_id="q1-p2", page_id="p2", question_id="q1", region_type="rectangle", polygon_norm=((0.0, 0.0), (0.2, 0.0), (0.2, 0.2), (0.0, 0.2))),
     )
     result = run_r1_pipeline(raw, regions, "s1", stroke_config=StrokeBuildConfig(max_spatial_jump_norm=1.0))
-    assert [event.event_type for event in result.student_process_events] == ["WRITING", "QUESTION_VISIT", "PAGE_CHANGE", "WRITING", "QUESTION_LEAVE", "RETURN", "REVISION_CANDIDATE"]
+    assert [event.event_type for event in result.student_process_events] == ["WRITING", "QUESTION_VISIT", "PAGE_CHANGE", "WRITING", "QUESTION_LEAVE", "RETURN"]

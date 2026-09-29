@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import hypot
 from typing import Any
 
@@ -11,7 +11,8 @@ from ..mapper import StrokeMapping
 from ..models import Point, Stroke, StudentProcessEvent
 
 PROCESS_SCHEMA_VERSION = "1.0.0"
-EVENT_ALGORITHM_VERSION = "r1-event-rule-v0.2"
+EVENT_ALGORITHM_VERSION = "r1-event-rule-v0.2.1"
+UNKNOWN_PARTICIPANT_BUCKET = "UNKNOWN_PARTICIPANT"
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,7 +20,6 @@ class EventDetectionConfig:
     revision_pause_threshold_ms: int = 3_000
     revision_overlap_threshold: float = 0.10
     process_end_timeout_ms: int | None = None
-    emit_process_end: bool = False
 
     def __post_init__(self) -> None:
         if isinstance(self.revision_pause_threshold_ms, bool) or not isinstance(self.revision_pause_threshold_ms, int) or self.revision_pause_threshold_ms < 0:
@@ -28,6 +28,34 @@ class EventDetectionConfig:
             raise ValueError("revision_overlap_threshold must be in [0, 1]")
         if self.process_end_timeout_ms is not None and (isinstance(self.process_end_timeout_ms, bool) or not isinstance(self.process_end_timeout_ms, int) or self.process_end_timeout_ms < 0):
             raise ValueError("process_end_timeout_ms must be a non-negative integer or None")
+
+
+@dataclass
+class ParticipantProcessState:
+    """State for one observed participant (or the explicit unknown bucket)."""
+
+    visited_questions: set[str] = field(default_factory=set)
+    active_question: str | None = None
+    active_mapping: StrokeMapping | None = None
+    previous_page_id: str | None = None
+    question_ink_history: dict[tuple[str, str, str, str], list["_StrokeBBox"]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class _StrokeBBox:
+    left: float
+    top: float
+    right: float
+    bottom: float
+    coordinate_space: str
+    page_id: str | None
+    participant_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class _PendingEvent:
+    sort_key: tuple[object, ...]
+    event: StudentProcessEvent
 
 
 def detect_student_process_events(
@@ -43,14 +71,14 @@ def detect_student_process_events(
     data_version: str | None = None,
     source_provenance: Mapping[str, Any] | None = None,
 ) -> tuple[StudentProcessEvent, ...]:
-    """Convert ordered Stroke mappings into observable process events.
+    """Convert ordered Stroke mappings into participant-isolated events.
 
-    EOF alone is never a process end.  ``process_end_signal`` or a caller
-    supplied ``session_end_ms`` together with a configured timeout is required.
+    EOF alone is never a process end.  A process end comes only from the
+    explicit signal or from a caller-supplied session end plus timeout.
     """
 
     active_config = config or EventDetectionConfig()
-    ordered = tuple(sorted(tuple(mappings), key=lambda item: (item.start_time_ms is None, item.start_time_ms if item.start_time_ms is not None else 0, item.stroke_id)))
+    ordered = tuple(sorted(tuple(mappings), key=lambda item: (item.start_time_ms is None, item.start_time_ms if item.start_time_ms is not None else 0, _participant_bucket(item.participant_id), item.stroke_id)))
     if not ordered:
         return ()
     session_ids = {mapping.session_id for mapping in ordered}
@@ -59,12 +87,53 @@ def detect_student_process_events(
     session_id = ordered[0].session_id
     stroke_index = {stroke.stroke_id: stroke for stroke in (strokes or ())}
     point_index = {point.point_id: point for point in (points or ())}
-    events: list[StudentProcessEvent] = []
-    visited_questions: set[str] = set()
-    active_question: str | None = None
-    active_mapping: StrokeMapping | None = None
-    previous_page_id: str | None = None
-    question_ink_history: dict[str, list[tuple[float, float, float, float]]] = {}
+    grouped: dict[str, list[StrokeMapping]] = {}
+    for mapping in ordered:
+        grouped.setdefault(_participant_bucket(mapping.participant_id), []).append(mapping)
+
+    pending: list[_PendingEvent] = []
+    for bucket in sorted(grouped):
+        pending.extend(
+            _detect_participant_events(
+                grouped[bucket],
+                bucket=bucket,
+                session_id=session_id,
+                stroke_index=stroke_index,
+                point_index=point_index,
+                config=active_config,
+                process_end_signal=process_end_signal,
+                session_end_ms=session_end_ms,
+                schema_version=schema_version,
+                task_segment_id=task_segment_id,
+                data_version=data_version,
+                source_provenance=source_provenance,
+            )
+        )
+
+    pending.sort(key=lambda item: item.sort_key)
+    result: list[StudentProcessEvent] = []
+    for sequence, item in enumerate(pending):
+        result.append(item.event.model_copy(update={"event_id": f"{session_id}:event:{sequence:04d}", "sequence": sequence}))
+    return tuple(result)
+
+
+def _detect_participant_events(
+    mappings: list[StrokeMapping],
+    *,
+    bucket: str,
+    session_id: str,
+    stroke_index: dict[str, Stroke],
+    point_index: dict[str, Point],
+    config: EventDetectionConfig,
+    process_end_signal: bool,
+    session_end_ms: int | None,
+    schema_version: str,
+    task_segment_id: str | None,
+    data_version: str | None,
+    source_provenance: Mapping[str, Any] | None,
+) -> list[_PendingEvent]:
+    state = ParticipantProcessState()
+    pending: list[_PendingEvent] = []
 
     def emit(
         event_type: str,
@@ -78,6 +147,7 @@ def detect_student_process_events(
         metadata: dict[str, object] | None = None,
         confidence: float | None = None,
         source_mapping: StrokeMapping | None = None,
+        order_mapping: StrokeMapping | None = None,
     ) -> None:
         source = source_mapping or mapping
         start_time_ms = occurred_at_ms if occurred_at_ms is not None else mapping.start_time_ms
@@ -85,98 +155,104 @@ def detect_student_process_events(
         event_quality_flags = list(mapping.quality_flags) + list(quality_flags)
         if start_time_ms is None or end_time_ms is None:
             event_quality_flags.append("TIME_UNAVAILABLE")
-        events.append(
-            StudentProcessEvent(
-                event_id=f"{session_id}:event:{len(events):04d}",
-                schema_version=schema_version,
-                event_type=event_type,
-                session_id=session_id,
-                task_segment_id=task_segment_id,
-                participant_id=source.participant_id,
-                page_id=mapping.page_id,
-                data_version=data_version,
-                sequence=len(events),
-                start_time_ms=start_time_ms,
-                end_time_ms=end_time_ms,
-                question_id=question_id,
-                previous_question_id=previous_question_id,
-                next_question_id=next_question_id,
-                stroke_refs=(source.stroke_id,),
-                point_refs=source.point_refs,
-                quality_status="DEGRADED" if (event_quality_flags or mapping.status != "MAPPED") else "VALID",
-                algorithm_version=EVENT_ALGORITHM_VERSION,
-                provenance=source_provenance or {},
-                mapping_confidence=confidence,
-                quality_flags=tuple(dict.fromkeys(event_quality_flags)),
-                metadata=metadata or {},
-            )
+        local_sequence = len(pending)
+        event = StudentProcessEvent(
+            event_id=f"{session_id}:{bucket}:event:{local_sequence:04d}",
+            schema_version=schema_version,
+            event_type=event_type,
+            session_id=session_id,
+            task_segment_id=task_segment_id,
+            participant_id=source.participant_id,
+            page_id=mapping.page_id,
+            data_version=data_version,
+            sequence=local_sequence,
+            start_time_ms=start_time_ms,
+            end_time_ms=end_time_ms,
+            question_id=question_id,
+            previous_question_id=previous_question_id,
+            next_question_id=next_question_id,
+            stroke_refs=(source.stroke_id,),
+            point_refs=source.point_refs,
+            quality_status="DEGRADED" if (event_quality_flags or mapping.status != "MAPPED") else "VALID",
+            algorithm_version=EVENT_ALGORITHM_VERSION,
+            provenance=source_provenance or {},
+            mapping_confidence=confidence,
+            quality_flags=tuple(dict.fromkeys(event_quality_flags)),
+            metadata=metadata or {},
         )
+        anchor = order_mapping or mapping
+        semantic_order = {"PAGE_CHANGE": 0, "WRITING": 1, "QUESTION_LEAVE": 2, "QUESTION_VISIT": 3, "RETURN": 3, "REVISION_CANDIDATE": 4, "UNKNOWN": 5, "PROCESS_END": 6}.get(event_type, 9)
+        pending.append(_PendingEvent((anchor.start_time_ms is None, anchor.start_time_ms if anchor.start_time_ms is not None else 0, bucket, anchor.stroke_id, semantic_order, local_sequence), event))
 
-    for mapping in ordered:
+    for mapping in mappings:
         stroke = stroke_index.get(mapping.stroke_id)
-        page_changed = _known_page(previous_page_id) and _known_page(mapping.page_id) and mapping.page_id != previous_page_id
+        page_changed = _known_page(state.previous_page_id) and _known_page(mapping.page_id) and mapping.page_id != state.previous_page_id
         if page_changed:
-            emit("PAGE_CHANGE", mapping, metadata={"from_page_id": previous_page_id, "to_page_id": mapping.page_id}, confidence=mapping.confidence)
+            emit("PAGE_CHANGE", mapping, metadata={"from_page_id": state.previous_page_id, "to_page_id": mapping.page_id}, confidence=mapping.confidence)
         if _known_page(mapping.page_id):
-            previous_page_id = mapping.page_id
+            state.previous_page_id = mapping.page_id
 
-        writing_evidence = _has_writing_evidence(mapping, stroke, point_index)
+        writing_evidence = _has_writing_evidence(stroke, point_index)
         current_bbox = _stroke_bbox(stroke, point_index)
-        prior_bboxes = tuple(question_ink_history.get(mapping.question_id, ())) if mapping.question_id is not None else ()
         if writing_evidence:
             emit("WRITING", mapping, question_id=mapping.question_id if mapping.status == "MAPPED" else None, confidence=mapping.confidence, metadata={"evidence": "observable_geometry_or_pen_contact"})
 
         if mapping.status != "MAPPED" or mapping.question_id is None:
-            if active_question is not None and active_mapping is not None:
-                emit("QUESTION_LEAVE", active_mapping, occurred_at_ms=active_mapping.end_time_ms, question_id=active_question, next_question_id=None, source_mapping=active_mapping, metadata={"reason": "mapping_unavailable"})
-                active_question = None
-                active_mapping = None
+            if state.active_question is not None and state.active_mapping is not None:
+                emit("QUESTION_LEAVE", state.active_mapping, occurred_at_ms=state.active_mapping.end_time_ms, question_id=state.active_question, next_question_id=None, source_mapping=state.active_mapping, metadata={"reason": "mapping_unavailable"}, order_mapping=mapping)
+                state.active_question = None
+                state.active_mapping = None
             emit("UNKNOWN", mapping, question_id="UNKNOWN", quality_flags=mapping.quality_flags or ("UNKNOWN_MAPPING",), metadata={"mapping_status": mapping.status})
             continue
 
         question_id = mapping.question_id
-        revisited = question_id in visited_questions and (active_question != question_id or page_changed)
-        paused = _has_pause(active_mapping, mapping, active_config.revision_pause_threshold_ms) if active_question == question_id else False
-        overlaps_prior = current_bbox is not None and any(_bbox_iou(current_bbox, previous) >= active_config.revision_overlap_threshold for previous in prior_bboxes)
+        revisited = question_id in state.visited_questions and (state.active_question != question_id or page_changed)
+        paused = _has_pause(state.active_mapping, mapping, config.revision_pause_threshold_ms) if state.active_question == question_id and not page_changed else False
+        history_key = _history_key(bucket, question_id, mapping.page_id, current_bbox)
+        prior_bboxes = tuple(state.question_ink_history.get(history_key, ())) if history_key is not None else ()
+        overlaps_prior = current_bbox is not None and any(_bbox_iou(current_bbox, previous) is not None and _bbox_iou(current_bbox, previous) >= config.revision_overlap_threshold for previous in prior_bboxes)
 
-        if active_question is None:
+        if state.active_question is None:
             emit("RETURN" if revisited else "QUESTION_VISIT", mapping, question_id=question_id, confidence=mapping.confidence)
-        elif active_question == question_id and not page_changed:
+        elif state.active_question == question_id and not page_changed:
             if prior_bboxes and (paused or revisited) and overlaps_prior:
                 emit("REVISION_CANDIDATE", mapping, question_id=question_id, confidence=mapping.confidence, metadata={"reason": "prior_ink_pause_or_revisit_overlap"})
         else:
-            emit("QUESTION_LEAVE", active_mapping or mapping, occurred_at_ms=active_mapping.end_time_ms if active_mapping else None, question_id=active_question, next_question_id=question_id, source_mapping=active_mapping or mapping)
-            emit("RETURN" if revisited else "QUESTION_VISIT", mapping, question_id=question_id, previous_question_id=active_question, confidence=mapping.confidence)
+            emit("QUESTION_LEAVE", state.active_mapping or mapping, occurred_at_ms=state.active_mapping.end_time_ms if state.active_mapping else None, question_id=state.active_question, next_question_id=question_id, source_mapping=state.active_mapping or mapping, order_mapping=mapping)
+            emit("RETURN" if revisited else "QUESTION_VISIT", mapping, question_id=question_id, previous_question_id=state.active_question, confidence=mapping.confidence)
             if prior_bboxes and overlaps_prior:
                 emit("REVISION_CANDIDATE", mapping, question_id=question_id, confidence=mapping.confidence, metadata={"reason": "reentry_overlap"})
 
-        visited_questions.add(question_id)
-        active_question = question_id
-        active_mapping = mapping
-        if writing_evidence and current_bbox is not None:
-            question_ink_history.setdefault(question_id, []).append(current_bbox)
+        state.visited_questions.add(question_id)
+        state.active_question = question_id
+        state.active_mapping = mapping
+        if writing_evidence and history_key is not None and current_bbox is not None:
+            state.question_ink_history.setdefault(history_key, []).append(current_bbox)
 
-    last_mapping = ordered[-1]
-    should_end = process_end_signal or active_config.emit_process_end
-    end_reason = "explicit_signal" if process_end_signal or active_config.emit_process_end else None
-    if session_end_ms is not None and active_config.process_end_timeout_ms is not None and last_mapping.end_time_ms is not None:
-        if session_end_ms - last_mapping.end_time_ms >= active_config.process_end_timeout_ms:
+    last_mapping = mappings[-1]
+    should_end = process_end_signal
+    end_reason = "explicit_signal" if process_end_signal else None
+    if session_end_ms is not None and config.process_end_timeout_ms is not None and last_mapping.end_time_ms is not None:
+        if session_end_ms - last_mapping.end_time_ms >= config.process_end_timeout_ms:
             should_end = True
             end_reason = "session_timeout"
     if should_end:
-        emit("PROCESS_END", last_mapping, occurred_at_ms=last_mapping.end_time_ms, question_id=active_question, source_mapping=last_mapping, metadata={"process_end_reason": end_reason or "configured"})
-    return tuple(events)
+        emit("PROCESS_END", last_mapping, occurred_at_ms=last_mapping.end_time_ms, question_id=state.active_question, source_mapping=last_mapping, metadata={"process_end_reason": end_reason or "configured"})
+    return pending
 
 
-def _has_writing_evidence(mapping: StrokeMapping, stroke: Stroke | None, points: dict[str, Point]) -> bool:
+def _participant_bucket(participant_id: str | None) -> str:
+    return participant_id if participant_id is not None else UNKNOWN_PARTICIPANT_BUCKET
+
+
+def _has_writing_evidence(stroke: Stroke | None, points: dict[str, Point]) -> bool:
     if stroke is None:
-        return len(mapping.point_refs) >= 2
+        return False
     referenced = [points[point_id] for point_id in stroke.processed_order if point_id in points]
-    valid = [point for point in referenced if (point.x_norm is not None and point.y_norm is not None) or (point.x_raw is not None and point.y_raw is not None)]
-    if len(valid) < 2:
+    if len(referenced) < 2:
         return False
     for coordinate_space in ("norm", "raw"):
-        pairs = [_point_pair(point, coordinate_space) for point in valid]
+        pairs = [_point_pair(point, coordinate_space) for point in referenced]
         if all(pair is not None for pair in pairs):
             length = sum(hypot(second[0] - first[0], second[1] - first[1]) for first, second in zip(pairs, pairs[1:]))
             if length > 1e-12:
@@ -185,33 +261,51 @@ def _has_writing_evidence(mapping: StrokeMapping, stroke: Stroke | None, points:
 
 
 def _point_pair(point: Point, space: str) -> tuple[float, float] | None:
-    return (point.x_norm, point.y_norm) if space == "norm" and point.x_norm is not None and point.y_norm is not None else ((point.x_raw, point.y_raw) if space == "raw" and point.x_raw is not None and point.y_raw is not None else None)
+    if space == "norm" and point.x_norm is not None and point.y_norm is not None:
+        return point.x_norm, point.y_norm
+    if space == "raw" and point.x_raw is not None and point.y_raw is not None:
+        return point.x_raw, point.y_raw
+    return None
 
 
-def _stroke_bbox(stroke: Stroke | None, points: dict[str, Point]) -> tuple[float, float, float, float] | None:
+def _stroke_bbox(stroke: Stroke | None, points: dict[str, Point]) -> _StrokeBBox | None:
     if stroke is None:
         return None
     referenced = [points[point_id] for point_id in stroke.processed_order if point_id in points]
+    if not referenced:
+        return None
     norm = [_point_pair(point, "norm") for point in referenced]
-    coordinates = [value for value in norm if value is not None]
-    if not coordinates:
-        coordinates = [value for value in (_point_pair(point, "raw") for point in referenced) if value is not None]
-    if not coordinates:
+    raw = [_point_pair(point, "raw") for point in referenced]
+    if all(value is not None for value in norm):
+        coordinates = [value for value in norm if value is not None]
+        space = "norm"
+    elif all(value is not None for value in raw):
+        coordinates = [value for value in raw if value is not None]
+        space = "raw"
+    else:
         return None
     xs = [value[0] for value in coordinates]
     ys = [value[1] for value in coordinates]
-    return min(xs), min(ys), max(xs), max(ys)
+    return _StrokeBBox(min(xs), min(ys), max(xs), max(ys), space, stroke.page_id, stroke.participant_id)
 
 
-def _bbox_iou(first: tuple[float, float, float, float], second: tuple[float, float, float, float]) -> float:
-    left, top = max(first[0], second[0]), max(first[1], second[1])
-    right, bottom = min(first[2], second[2]), min(first[3], second[3])
+def _history_key(participant_bucket: str, question_id: str, page_id: str | None, bbox: _StrokeBBox | None) -> tuple[str, str, str, str] | None:
+    if bbox is None or page_id is None or bbox.coordinate_space == "unavailable":
+        return None
+    return participant_bucket, question_id, page_id, bbox.coordinate_space
+
+
+def _bbox_iou(first: _StrokeBBox, second: _StrokeBBox) -> float | None:
+    if first.coordinate_space != second.coordinate_space or first.page_id != second.page_id or first.participant_id != second.participant_id:
+        return None
+    left, top = max(first.left, second.left), max(first.top, second.top)
+    right, bottom = min(first.right, second.right), min(first.bottom, second.bottom)
     intersection = max(0.0, right - left) * max(0.0, bottom - top)
-    area_first = max(0.0, first[2] - first[0]) * max(0.0, first[3] - first[1])
-    area_second = max(0.0, second[2] - second[0]) * max(0.0, second[3] - second[1])
+    area_first = max(0.0, first.right - first.left) * max(0.0, first.bottom - first.top)
+    area_second = max(0.0, second.right - second.left) * max(0.0, second.bottom - second.top)
     union = area_first + area_second - intersection
     if union <= 1e-12:
-        return 1.0 if first == second else 0.0
+        return 1.0 if (first.left, first.top, first.right, first.bottom) == (second.left, second.top, second.right, second.bottom) else 0.0
     return intersection / union
 
 

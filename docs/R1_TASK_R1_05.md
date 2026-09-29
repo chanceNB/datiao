@@ -111,3 +111,7 @@ PASS
 ## 16. NEXT RECOMMENDED TASK
 
 TASK-R1-06 — Synthetic Dataset / Manifest / Group Split（只建议，不执行）。
+
+## Post-validation fix
+
+TASK-R1-05-FIX-01 PASS

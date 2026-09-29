@@ -64,3 +64,13 @@ def test_quality_scenarios_degrade_to_unknown_without_fake_success():
 
         assert any(mapping.status == "UNKNOWN" for mapping in case.mappings)
         assert any(event.event_type == "UNKNOWN" for event in case.algorithm_output.events)
+
+
+def test_arc_length_cross_region_is_one_continuous_stroke_and_independent_truth():
+    case = generate_synthetic_case(Scenario("case-arc", "arc_length_cross_region", seed=4))
+    assert len(case.strokes) == 1
+    assert len(case.mappings) == 1
+    assert case.mappings[0].question_id == "q-02"
+    assert case.mappings[0].mapping_method == "ARC_LENGTH"
+    assert [event.event_type for event in case.algorithm_output.events] == ["WRITING", "QUESTION_VISIT"]
+    assert [event.event_type for event in case.truth.truth_events] == ["WRITING", "QUESTION_VISIT"]

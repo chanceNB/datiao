@@ -77,10 +77,9 @@ def test_missing_timestamp_forms_incomplete_stroke_without_drop():
 
     strokes = build_strokes(points)
 
-    assert len(strokes) == 2
-    assert strokes[0].raw_order == ("p-1",)
+    assert len(strokes) == 1
+    assert strokes[0].raw_order == ("p-1", "p-2")
     assert "INCOMPLETE" in strokes[0].quality_flags
-    assert strokes[1].raw_order == ("p-2",)
 
 
 def test_empty_input_returns_empty_tuple():

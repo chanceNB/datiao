@@ -53,6 +53,7 @@ def test_participant_and_task_context_do_not_mix():
 def test_missing_timestamp_is_retained_and_does_not_create_fake_time():
     points = parse_raw_points((point("a", None, 0.1, 0.1), point("b", 10, 0.11, 0.1, sequence=1)))
     strokes = build_strokes(points, StrokeBuildConfig(max_spatial_jump_norm=1.0))
-    assert len(strokes) == 2
+    assert len(strokes) == 1
     assert points[0].timestamp_ms is None
     assert "MISSING_TIMESTAMP" in points[0].quality_flags
+    assert "INCOMPLETE" in strokes[0].quality_flags

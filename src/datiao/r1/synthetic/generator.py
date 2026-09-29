@@ -9,7 +9,7 @@ from ..event import detect_student_process_events
 from ..mapper import map_strokes_to_regions
 from ..models import Point, QuestionRegion
 from ..parser import parse_raw_points
-from ..stroke import build_strokes
+from ..stroke import StrokeBuildConfig, build_strokes
 from .models import (
     Scenario,
     SyntheticAlgorithmOutput,
@@ -86,6 +86,29 @@ def default_regions() -> tuple[QuestionRegion, ...]:
 
 
 def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
+    if scenario.scenario_type == "arc_length_cross_region":
+        # One continuous path: many samples in A, then a longer trajectory in B.
+        # Point-count and arc-length weighting therefore prefer different regions.
+        norm_xs = (0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.25, 0.35, 0.45, 0.55, 0.65)
+        return tuple(
+            {
+                "point_id": f"sim_{scenario.scenario_id}_point_{index:03d}",
+                "session_id": f"sim_session_{scenario.scenario_id}",
+                "participant_id": "sim_p_001",
+                "task_segment_id": "sim_segment_practice_01",
+                "page_id": "page-01",
+                "x": x * 100.0,
+                "y": 5.0,
+                "x_norm": x,
+                "y_norm": 0.05,
+                "timestamp_ms": index * 20,
+                "sequence": index,
+                "scenario_id": scenario.scenario_id,
+                "question_id": "q-02",
+                "generator_version": scenario.generator_version,
+            }
+            for index, x in enumerate(norm_xs)
+        )
     rng = random.Random(scenario.seed)
     records: list[dict[str, object]] = []
     point_counter = 0
@@ -140,6 +163,15 @@ def generate_raw_points(scenario: Scenario) -> tuple[Point, ...]:
 def _truth_for(scenario: Scenario, raw_points: tuple[Point, ...]) -> SyntheticTruth:
     """Build truth from the scenario plan, independently of the detector."""
 
+    if scenario.scenario_type == "arc_length_cross_region":
+        source_ids = tuple(point.point_id for point in raw_points)
+        return SyntheticTruth(
+            scenario_id=scenario.scenario_id,
+            truth_events=(
+                SyntheticTruthEvent(event_id=f"sim_{scenario.scenario_id}_truth_0000", event_type="WRITING", page_id="page-01", question_id="q-02", source_point_ids=source_ids),
+                SyntheticTruthEvent(event_id=f"sim_{scenario.scenario_id}_truth_0001", event_type="QUESTION_VISIT", page_id="page-01", question_id="q-02", source_point_ids=source_ids),
+            ),
+        )
     actions = _action_plan(scenario)
     truth_events: list[SyntheticTruthEvent] = []
     visited: set[str] = set()
@@ -208,7 +240,13 @@ def generate_synthetic_case(scenario: Scenario) -> SyntheticCase:
     manifest_hash = compute_manifest_hash(manifest)
     raw_points = parse_raw_points(raw_records)
     regions = default_regions()
-    strokes = build_strokes(raw_points)
+    if scenario.scenario_type == "arc_length_cross_region":
+        regions = (
+            QuestionRegion(region_id="arc-a", page_id="page-01", question_id="q-01", region_type="rectangle", polygon_norm=((0.0, 0.0), (0.1, 0.0), (0.1, 0.1), (0.0, 0.1))),
+            QuestionRegion(region_id="arc-b", page_id="page-01", question_id="q-02", region_type="rectangle", polygon_norm=((0.2, 0.0), (0.7, 0.0), (0.7, 0.1), (0.2, 0.1))),
+        )
+    stroke_config = StrokeBuildConfig(max_spatial_jump_norm=1.0) if scenario.scenario_type == "arc_length_cross_region" else None
+    strokes = build_strokes(raw_points, stroke_config)
     mappings = map_strokes_to_regions(strokes, raw_points, regions)
     provenance = {
         "dataset_type": "synthetic",

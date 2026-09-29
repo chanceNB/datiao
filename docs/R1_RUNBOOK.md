@@ -11,7 +11,7 @@ python -m pytest
 
 `.[test]` 会安装项目和全部 Contract/R1 测试依赖，包括 `pytest` 与 `jsonschema`。运行手册不依赖某个开发者的本机 Python 路径。
 
-当前仓库全量测试以实际 pytest 输出为准；TASK-R1-05 完成时为 86 个（R1 55，Contract 31）。真实设备字段尚未冻结时，只能传入以下规范化字段：
+当前仓库全量测试以实际 pytest 输出为准；TASK-R1-05-FIX-01 完成时为 99 个（R1 68，Contract 31）。真实设备字段尚未冻结时，只能传入以下规范化字段：
 
 ```text
 point_id, session_id, page_id, timestamp_ms, x, y, sequence
@@ -58,6 +58,8 @@ WRITING, QUESTION_VISIT
 输入 EOF 不代表过程结束。只有显式传入 `process_end_signal=True`，或同时提供 `session_end_ms` 与配置的 inactivity timeout，才会产生 `PROCESS_END`。同一题的普通多 Stroke 续写只产生 `WRITING`；`REVISION_CANDIDATE` 需要 prior ink、暂停/回访和空间重叠证据。
 
 Question Mapping 使用 `r1-qmap-arc-v1` 的轨迹弧长覆盖；零长度 Stroke 会显式记录 `POINT_FALLBACK`。当前所有阈值均为 development default，正式实验必须在 Dev/Validation 校准后冻结。
+
+Student Process state 按 `participant_id` 隔离；`participant_id=null` 使用独立的 `UNKNOWN_PARTICIPANT` bucket。Stroke bbox 会记录 `bbox_coordinate_space`，只在同 participant、同 page、同 coordinate space 下比较 revision overlap。缺失 timestamp 不再自动切 Stroke，但会保留 degraded quality。PROCESS_END 只接受显式 end 或带外部 session end reference 的 participant-aware timeout。
 
 无法映射或来源不完整时，结果仍保留原始点和 Stroke，并将状态设为 `DEGRADED`；空输入返回 `INVALID`。这些状态不表示学生心理、能力或作答正确性。
 
