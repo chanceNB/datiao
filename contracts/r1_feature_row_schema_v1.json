@@ -1,1 +1,13 @@
-{"title":"R1 Feature Row","type":"object","required":["episode_id","split","features","target"],"properties":{"episode_id":{"type":"string"},"split":{"enum":["train","validation","test"]},"features":{"type":"object"},"target":{"type":"array","minItems":8,"maxItems":8}}}
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://chanceNB.github.io/datiao/contracts/r1_feature_row_schema_v1.json",
+  "title":"FeatureRow V1","type":"object","additionalProperties":false,
+  "required":["episode_id","split","features","target"],
+  "properties":{
+    "episode_id":{"type":"string","minLength":1},"split":{"enum":["train","validation","test"]},
+    "features":{"type":"object","additionalProperties":false,"required":["duration_s","path_length_norm","mean_speed_norm_per_s","pause_before_s","pause_inside_s","bbox_width_norm","bbox_height_norm","question_occupancy","visit_index","return_count","previous_ink_iou","quality_valid"],"properties":{
+      "duration_s":{"type":["number","null"]},"path_length_norm":{"type":["number","null"]},"mean_speed_norm_per_s":{"type":["number","null"]},"pause_before_s":{"type":["number","null"]},"pause_inside_s":{"type":["number","null"]},"bbox_width_norm":{"type":["number","null"]},"bbox_height_norm":{"type":["number","null"]},"question_occupancy":{"type":["number","null"],"minimum":0,"maximum":1},"visit_index":{"type":["number","null"],"minimum":1},"return_count":{"type":["number","null"],"minimum":0},"previous_ink_iou":{"type":["number","null"],"minimum":0,"maximum":1},"quality_valid":{"type":"number","enum":[0,1]}
+    }},
+    "target":{"type":"array","prefixItems":[{"type":"integer","enum":[0,1]},{"type":"integer","enum":[0,1]},{"type":"integer","enum":[0,1]},{"type":"integer","enum":[0,1]},{"type":"integer","enum":[0,1]},{"type":"integer","enum":[0,1]},{"type":"integer","enum":[0,1]},{"type":"integer","enum":[0,1]}],"items":false,"minItems":8,"maxItems":8}
+  }
+}

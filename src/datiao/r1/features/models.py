@@ -100,7 +100,10 @@ class FeatureRow(BaseModel):
         values = dict(data)
         if isinstance(values.get("target"), list): values["target"] = tuple(values["target"])
         if isinstance(values.get("features"), dict):
-            values["features"] = {key: values["features"].get(key) for key in FEATURE_ORDER}
+            keys = set(values["features"])
+            if keys != set(FEATURE_ORDER):
+                raise ValueError("feature keys must exactly match frozen FEATURE_ORDER")
+            values["features"] = {key: values["features"][key] for key in FEATURE_ORDER}
         return values
 
     @model_validator(mode="after")
@@ -158,6 +161,13 @@ class AlignmentRecord(BaseModel):
     matched_episode_ids: tuple[str, ...] = ()
     alignment_status: Literal["ONE_TO_ONE", "ONE_TO_MANY", "UNMATCHED", "AMBIGUOUS"]
 
+    @model_validator(mode="before")
+    @classmethod
+    def prepare_arrays(cls, data: Any) -> Any:
+        values = dict(data)
+        if isinstance(values.get("matched_episode_ids"), list): values["matched_episode_ids"] = tuple(values["matched_episode_ids"])
+        return values
+
 
 class FeatureSplitManifest(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
@@ -168,6 +178,17 @@ class FeatureSplitManifest(BaseModel):
     episode_ids: tuple[str, ...]
     sequence_ids: tuple[str, ...]
     count: int = Field(ge=1)
+    sequence_count: int = Field(ge=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def prepare_arrays(cls, data: Any) -> Any:
+        values = dict(data)
+        for key in ("episode_ids", "sequence_ids"):
+            if isinstance(values.get(key), list): values[key] = tuple(values[key])
+        if "sequence_count" not in values and isinstance(values.get("sequence_ids"), (list, tuple)):
+            values["sequence_count"] = len(values["sequence_ids"])
+        return values
 
 
 class FeatureManifest(BaseModel):

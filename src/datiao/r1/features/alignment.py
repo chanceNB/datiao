@@ -9,6 +9,12 @@ def align_truth(episodes, truth_by_case):
     for case_id, events in truth_by_case.items():
         for event in events:
             candidates=[ep for ep in by_case.get(case_id,[]) if set(ep.point_refs)&set(event.source_point_ids)]
+            if event.page_id is not None:
+                page_matches=[ep for ep in candidates if ep.page_id is None or ep.page_id == event.page_id]
+                if page_matches: candidates=page_matches
+            if event.question_id is not None:
+                question_matches=[ep for ep in candidates if ep.question_id is None or ep.question_id == event.question_id]
+                if question_matches: candidates=question_matches
             if len(candidates)==0: status='UNMATCHED'
             elif len(candidates)==1: status='ONE_TO_ONE'
             else: status='ONE_TO_MANY'

@@ -25,6 +25,7 @@ def run_feature_leakage_audit(rows: Iterable[FeatureRow]) -> dict[str, Any]:
 
 
 def run_feature_range_audit(rows: Iterable[FeatureRow]) -> dict[str, Any]:
+    rows = tuple(rows)
     violations: list[dict[str, Any]] = []
     bounded = {"question_occupancy", "previous_ink_iou"}
     nonnegative = {"duration_s", "path_length_norm", "mean_speed_norm_per_s", "pause_before_s", "pause_inside_s", "bbox_width_norm", "bbox_height_norm", "visit_index", "return_count"}
@@ -38,7 +39,7 @@ def run_feature_range_audit(rows: Iterable[FeatureRow]) -> dict[str, Any]:
                 violations.append({"episode_id": row.episode_id, "feature": key, "value": value})
             if key == "quality_valid" and value not in (0, 1):
                 violations.append({"episode_id": row.episode_id, "feature": key, "value": value})
-    return {"status": "PASS" if not violations else "FAIL", "violations": violations, "row_count": len(tuple(rows)) if not isinstance(rows, tuple) else len(rows)}
+    return {"status": "PASS" if not violations else "FAIL", "violations": violations, "row_count": len(rows)}
 
 
 def run_alignment_audit(records: Iterable[AlignmentRecord]) -> dict[str, Any]:

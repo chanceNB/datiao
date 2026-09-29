@@ -1,1 +1,9 @@
-{"title":"R1 Observation Episode","type":"object","required":["episode_id","case_id","stroke_id","split","point_refs"],"properties":{"episode_id":{"type":"string"},"case_id":{"type":"string"},"stroke_id":{"type":"string"},"split":{"enum":["train","validation","test"]},"point_refs":{"type":"array","items":{"type":"string"}}}}
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://chanceNB.github.io/datiao/contracts/r1_episode_schema_v1.json",
+  "title":"ObservationEpisode V1","type":"object","additionalProperties":false,
+  "required":["episode_id","case_id","dataset_id","dataset_version","participant_id","session_id","task_segment_id","device_id","split","stroke_id","point_refs","mapping_status","mapping_method","episode_index","quality_status","quality_flags","feature_builder_version"],
+  "properties":{
+    "episode_id":{"type":"string","minLength":1},"case_id":{"type":"string","minLength":1},"dataset_id":{"type":"string","minLength":1},"dataset_version":{"type":"string","minLength":1},"participant_id":{"type":"string","minLength":1},"session_id":{"type":"string","minLength":1},"task_segment_id":{"type":"string","minLength":1},"device_id":{"type":"string","minLength":1},"split":{"enum":["train","validation","test"]},"stroke_id":{"type":"string","minLength":1},"point_refs":{"type":"array","items":{"type":"string"}},"page_id":{"type":["string","null"]},"question_id":{"type":["string","null"]},"mapping_status":{"enum":["MAPPED","UNKNOWN","AMBIGUOUS"]},"mapping_method":{"enum":["ARC_LENGTH","POINT_FALLBACK","UNKNOWN"]},"start_time_ms":{"type":["integer","null"]},"end_time_ms":{"type":["integer","null"]},"episode_index":{"type":"integer","minimum":0},"question_visit_index":{"type":["integer","null"],"minimum":1},"question_return_count":{"type":["integer","null"],"minimum":0},"quality_status":{"enum":["VALID","DEGRADED"]},"quality_flags":{"type":"array","items":{"type":"string"}},"feature_builder_version":{"type":"string","minLength":1}
+  }
+}

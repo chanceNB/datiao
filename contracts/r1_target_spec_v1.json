@@ -1,1 +1,14 @@
-{"target_spec_version":"r1-event-multilabel-v1","granularity":"episode","encoding":"multi_hot","label_order":["WRITING","QUESTION_VISIT","QUESTION_LEAVE","RETURN","REVISION_CANDIDATE","PAGE_CHANGE","PROCESS_END","UNKNOWN"],"source":"independent_synthetic_truth","alignment":"source_point_overlap","alignment_version":"r1-truth-align-v1","unmatched_policy":"fail_build","ambiguous_policy":"fail_build","negative_encoding":"all_zero_is_valid_negative","future_lightgbm":"one_vs_rest","future_tcn":"8_logits_with_BCEWithLogitsLoss"}
+{
+  "target_spec_version": "r1-event-multilabel-v1",
+  "supervision_granularity": "episode",
+  "task_type": "multi_label_binary",
+  "label_order": ["WRITING","QUESTION_VISIT","QUESTION_LEAVE","RETURN","REVISION_CANDIDATE","PAGE_CHANGE","PROCESS_END","UNKNOWN"],
+  "encoding": "multi_hot",
+  "label_source": "independent_synthetic_truth",
+  "alignment_version": "r1-truth-align-v1",
+  "allowed_overlap": true,
+  "ignore_policy": "unmatched or ambiguous truth fails build",
+  "unlabeled_episode_policy": "all_zero_valid_negative",
+  "future_lightgbm_strategy": "8 one-vs-rest binary classifiers",
+  "future_tcn_loss": "8 logits with BCEWithLogitsLoss"
+}
