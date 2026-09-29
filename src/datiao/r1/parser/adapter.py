@@ -6,7 +6,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any, Protocol
 
 CANONICAL_POINT_FIELDS = frozenset(
-    {"point_id", "session_id", "page_id", "x", "y", "timestamp_ms", "sequence"}
+    {"point_id", "session_id", "page_id", "timestamp_ms", "sequence"}
 )
 
 
@@ -31,6 +31,8 @@ def adapt_canonical_records(records: Iterable[Mapping[str, Any]]) -> tuple[dict[
         if not isinstance(record, Mapping):
             raise CanonicalPointAdapterError(f"record {index} must be a mapping")
         missing = sorted(CANONICAL_POINT_FIELDS.difference(record.keys()))
+        if not ({"x", "y"} <= record.keys() or {"x_raw", "y_raw"} <= record.keys()):
+            missing.extend(("x/y or x_raw/y_raw",))
         if missing:
             raise CanonicalPointAdapterError(
                 f"record {index} is missing canonical fields: {', '.join(missing)}"

@@ -56,3 +56,12 @@ def test_unknown_pen_state_is_explicit():
         source_index=0, raw_order=0, processed_order=0, source_payload={},
     )
     assert point.pen_state == "UNKNOWN"
+from datiao.r1.parser import adapt_canonical_records
+
+
+def test_canonical_adapter_accepts_explicit_v1_raw_coordinates():
+    records = adapt_canonical_records(({
+        "point_id": "p", "session_id": "s", "page_id": "page", "x_raw": 1.0,
+        "y_raw": 2.0, "timestamp_ms": 0, "sequence": 0,
+    },))
+    assert records[0]["x_raw"] == 1.0
