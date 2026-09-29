@@ -38,3 +38,13 @@ def test_synthetic_provenance_rejects_placeholder_hash_and_psychological_fields(
                                "manifest_hash": "sha256:REPLACE_WITH_REAL_HASH"})
     with pytest.raises(ValidationError):
         make_event(metadata={"emotion": "anxious"})
+from datiao.r1.event import detect_student_process_events
+from datiao.r1.mapper import StrokeMapping
+
+
+def test_detector_emits_contract_version_1_0_0():
+    events = detect_student_process_events((StrokeMapping(
+        stroke_id="s", session_id="session", page_id="page", question_id="Q",
+        status="MAPPED", start_time_ms=0, end_time_ms=1, point_refs=("p",),
+    ),))
+    assert events[0].schema_version == "1.0.0"

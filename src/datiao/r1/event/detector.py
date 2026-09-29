@@ -8,7 +8,7 @@ from typing import Any
 from ..mapper import StrokeMapping
 from ..models import StudentProcessEvent
 
-PROCESS_SCHEMA_VERSION = "r1.process.v1"
+PROCESS_SCHEMA_VERSION = "1.0.0"
 
 
 def detect_student_process_events(
