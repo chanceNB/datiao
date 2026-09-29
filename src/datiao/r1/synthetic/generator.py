@@ -12,6 +12,7 @@ from ..parser import parse_raw_points
 from ..stroke import StrokeBuildConfig, build_strokes
 from .models import (
     Scenario,
+    SyntheticCaseSpec,
     SyntheticAlgorithmOutput,
     SyntheticCase,
     SyntheticTruth,
@@ -85,18 +86,23 @@ def default_regions() -> tuple[QuestionRegion, ...]:
     )
 
 
-def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
+def _raw_records(scenario: Scenario, context: SyntheticCaseSpec | None = None) -> tuple[dict[str, object], ...]:
+    participant_id = context.participant_id if context is not None else "sim_p_001"
+    session_id = context.session_id if context is not None else f"sim_session_{scenario.scenario_id}"
+    task_segment_id = context.task_segment_id if context is not None else "sim_segment_practice_01"
+    device_id = context.device_id if context is not None else "sim_pen_001"
+    point_prefix = context.case_id if context is not None else f"sim_{scenario.scenario_id}"
     if scenario.scenario_type == "arc_length_cross_region":
         # One continuous path: many samples in A, then a longer trajectory in B.
         # Point-count and arc-length weighting therefore prefer different regions.
         norm_xs = (0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.25, 0.35, 0.45, 0.55, 0.65)
         return tuple(
             {
-                "point_id": f"sim_{scenario.scenario_id}_point_{index:03d}",
-                "session_id": f"sim_session_{scenario.scenario_id}",
-                "participant_id": "sim_p_001",
-                "device_id": "sim_pen_001",
-                "task_segment_id": "sim_segment_practice_01",
+                "point_id": f"{point_prefix}_point_{index:03d}",
+                "session_id": session_id,
+                "participant_id": participant_id,
+                "device_id": device_id,
+                "task_segment_id": task_segment_id,
                 "page_id": "page-01",
                 "x": x * 100.0,
                 "y": 5.0,
@@ -115,9 +121,9 @@ def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
     point_counter = 0
     for action_index, action in enumerate(_action_plan(scenario)):
         for point_index in range(2):
-            point_id = f"sim_{scenario.scenario_id}_point_{point_counter:03d}"
+            point_id = f"{point_prefix}_point_{point_counter:03d}"
             if action.duplicate_point and point_index == 1:
-                point_id = f"sim_{scenario.scenario_id}_point_{point_counter - 1:03d}"
+                point_id = f"{point_prefix}_point_{point_counter - 1:03d}"
             if scenario.scenario_type == "continuous_same_question_writing":
                 timestamp = action_index * 1_200 + point_index * 50
             elif scenario.scenario_type in {"true_revision_overlap", "revision_candidate", "same_question_no_overlap"}:
@@ -136,10 +142,10 @@ def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
             records.append(
                 {
                     "point_id": point_id,
-                    "session_id": f"sim_session_{scenario.scenario_id}",
-                    "participant_id": "sim_p_001",
-                    "device_id": "sim_pen_001",
-                    "task_segment_id": "sim_segment_practice_01",
+                    "session_id": session_id,
+                    "participant_id": participant_id,
+                    "device_id": device_id,
+                    "task_segment_id": task_segment_id,
                     "page_id": action.page_id,
                     "x": x_value,
                     "y": y_value,
@@ -227,18 +233,25 @@ def _truth_for(scenario: Scenario, raw_points: tuple[Point, ...]) -> SyntheticTr
     return SyntheticTruth(scenario_id=scenario.scenario_id, truth_events=tuple(truth_events))
 
 
-def generate_synthetic_case(scenario: Scenario) -> SyntheticCase:
-    raw_records = _raw_records(scenario)
+def generate_synthetic_case(
+    scenario: Scenario,
+    context: SyntheticCaseSpec | None = None,
+) -> SyntheticCase:
+    raw_records = _raw_records(scenario, context)
+    session_id = context.session_id if context is not None else f"sim_session_{scenario.scenario_id}"
+    participant_id = context.participant_id if context is not None else "sim_p_001"
+    task_segment_id = context.task_segment_id if context is not None else "sim_segment_practice_01"
+    device_id = context.device_id if context is not None else "sim_pen_001"
     manifest = build_synthetic_manifest(
         dataset_id=f"synthetic:{scenario.scenario_id}",
         scenario_id=scenario.scenario_id,
         generator_version=scenario.generator_version,
         seed=scenario.seed,
-        session_id=f"sim_session_{scenario.scenario_id}",
-        participant_id="sim_p_001",
-        task_segment_id="sim_segment_practice_01",
+        session_id=session_id,
+        participant_id=participant_id,
+        task_segment_id=task_segment_id,
         raw_records=raw_records,
-        device_id="sim_pen_001",
+        device_id=device_id,
     )
     manifest_hash = compute_manifest_hash(manifest)
     raw_points = parse_raw_points(raw_records)
@@ -264,7 +277,7 @@ def generate_synthetic_case(scenario: Scenario) -> SyntheticCase:
         strokes=strokes,
         points=raw_points,
         process_end_signal=scenario.scenario_type == "explicit_process_end",
-        task_segment_id="sim_segment_practice_01",
+        task_segment_id=task_segment_id,
         source_provenance=provenance,
     )
     truth = _truth_for(scenario, raw_points)
@@ -283,3 +296,15 @@ def generate_synthetic_case(scenario: Scenario) -> SyntheticCase:
         truth=truth,
         algorithm_output=algorithm_output,
     )
+
+
+def generate_synthetic_case_from_spec(spec: SyntheticCaseSpec) -> SyntheticCase:
+    """Generate a case from stable dataset context without changing the legacy API."""
+
+    scenario = Scenario(
+        scenario_id=spec.scenario_id,
+        scenario_type=spec.scenario_type,
+        seed=spec.seed,
+        generator_version=spec.generator_version,
+    )
+    return generate_synthetic_case(scenario, context=spec)

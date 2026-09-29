@@ -34,6 +34,30 @@ ScenarioType = Literal[
 
 
 @dataclass(frozen=True, slots=True)
+class SyntheticCaseSpec:
+    """Stable dataset context for one generated synthetic case."""
+
+    case_id: str
+    participant_id: str
+    session_id: str
+    task_segment_id: str
+    device_id: str
+    scenario_id: str
+    scenario_type: ScenarioType
+    seed: int
+    task_family: str
+    group_id: str
+    generator_version: str = "r1.synthetic.v1"
+
+    def __post_init__(self) -> None:
+        for name in ("case_id", "participant_id", "session_id", "task_segment_id", "device_id", "scenario_id", "task_family", "group_id", "generator_version"):
+            if not getattr(self, name):
+                raise ValueError(f"{name} must not be empty")
+        if isinstance(self.seed, bool) or not isinstance(self.seed, int):
+            raise TypeError("seed must be an integer")
+
+
+@dataclass(frozen=True, slots=True)
 class Scenario:
     scenario_id: str
     scenario_type: ScenarioType

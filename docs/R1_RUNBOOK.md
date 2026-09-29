@@ -11,7 +11,7 @@ python -m pytest
 
 `.[test]` 会安装项目和全部 Contract/R1 测试依赖，包括 `pytest` 与 `jsonschema`。运行手册不依赖某个开发者的本机 Python 路径。
 
-当前仓库全量测试以实际 pytest 输出为准；TASK-R1-05-FIX-02 完成时为 108 个（R1 77，Contract 31）。真实设备字段尚未冻结时，只能传入以下规范化字段：
+当前仓库全量测试以实际 pytest 输出为准；TASK-R1-06 完成时为 118 个（R1 87，Contract 31）。真实设备字段尚未冻结时，只能传入以下规范化字段：
 
 ```text
 point_id, session_id, page_id, timestamp_ms, x, y, sequence
@@ -85,6 +85,26 @@ python -m pytest tests/contracts -q
 python -m pytest tests/r1 -q
 python -m pytest
 ```
+
+## R1 Synthetic Development Dataset（TASK-R1-06）
+
+配置文件为 `configs/r1_synthetic_dataset_v1.json`，默认生成 `r1-synthetic-penprocess-v1`，并明确标记 `dataset_type=synthetic`。它是 R1 的确定性开发候选数据与 participant-level Group Split，未来由 R4 重新审核和冻结，不代表真实学生数据或正式科研评测。
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m datiao.r1.dataset.builder `
+  --config configs/r1_synthetic_dataset_v1.json `
+  --output artifacts/r1_synthetic_penprocess_v1
+```
+
+已有输出默认不会被覆盖；需要重建时显式增加 `--overwrite`。构建会生成 Dataset Manifest、Summary、JSONL 数据文件、`splits/`、`audits/`，并在写出前执行 participant/session/group/case 与文件引用完整性审计。
+
+```powershell
+$env:PYTHONPATH = "src"
+python -c "from datiao.r1.dataset import reload_dataset; d=reload_dataset('artifacts/r1_synthetic_penprocess_v1'); print(d['manifest'].manifest_hash)"
+```
+
+Truth 与 R1 rule prediction 分别写入 `truth_events.jsonl` 和 `predicted_events.jsonl`。`scenario_type`、`scenario_id`、seed、truth、prediction、participant、split、case_id 和 manifest 字段属于审计/分组信息，未来 Feature Builder 默认不得直接展开为模型输入特征。
 
 
 
