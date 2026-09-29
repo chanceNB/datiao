@@ -51,6 +51,18 @@ def resolve_event_trace(
             raise TraceResolutionError(
                 f"point {point.point_id} belongs to another session"
             )
+    declared_point_ids = set(event.source_point_ids)
+    for stroke in resolved_strokes:
+        stroke_point_ids = set(stroke.point_refs)
+        if stroke_point_ids and not declared_point_ids:
+            raise TraceResolutionError(
+                f"event {event.event_id} declares stroke {stroke.stroke_id} without its point refs"
+            )
+        missing = stroke_point_ids.difference(declared_point_ids)
+        if missing:
+            raise TraceResolutionError(
+                f"event {event.event_id} point refs do not cover stroke {stroke.stroke_id}: {sorted(missing)}"
+            )
     return EvidenceTrace(
         event_id=event.event_id,
         session_id=event.session_id,

@@ -37,7 +37,7 @@ Synthetic 使用 `sim_session_...`、`sim_p_...`、`sim_segment_...` 标识，Se
 
 ## Breaking Changes 与兼容策略
 
-标准对象只序列化 V1 字段。旧属性仍提供只读访问或输入迁移辅助，便于现有离线链过渡；设备字段别名仍必须由显式 Adapter 映射，未确认的单位、标定和页面语义保持 null/UNKNOWN。下游应读取 V1 字段，不应依赖旧属性。
+标准对象只序列化 V1 字段。旧 payload 必须通过 `datiao.r1.models.legacy` 的显式适配器；V1 模型拒绝旧构造字段。内部仍保留少量只读访问别名以保护 Trace；设备字段别名仍必须由显式 Adapter 映射，未确认的单位、标定和页面语义保持 null/UNKNOWN。下游应读取 V1 字段，不应依赖旧属性。
 
 ## 当前明确未完成事项
 
@@ -48,3 +48,4 @@ Synthetic 使用 `sim_session_...`、`sim_p_...`、`sim_segment_...` 标识，Se
 ## 下一步
 
 `TASK-R1-05 — Algorithm Semantics Upgrade`，只给建议，不在本任务执行。
+

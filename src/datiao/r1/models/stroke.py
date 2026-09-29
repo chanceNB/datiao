@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -21,7 +21,7 @@ class BoundingBox(BaseModel):
 class Stroke(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
 
-    schema_version: str = Field(default="1.0.0", min_length=1)
+    schema_version: Literal["1.0.0"] = "1.0.0"
     stroke_id: str = Field(min_length=1)
     session_id: str = Field(min_length=1)
     participant_id: str | None = None
@@ -40,25 +40,15 @@ class Stroke(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def migrate_legacy_shape(cls, data: Any) -> Any:
+    def prepare_json_arrays(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
         values = dict(data)
-        if "start_time_ms" not in values and "start_timestamp_ms" in values:
-            values["start_time_ms"] = values.pop("start_timestamp_ms")
-        if "end_time_ms" not in values and "end_timestamp_ms" in values:
-            values["end_time_ms"] = values.pop("end_timestamp_ms")
-        values.pop("start_timestamp_ms", None)
-        values.pop("end_timestamp_ms", None)
-        values.setdefault("point_refs", values.get("raw_order", ()))
-        start = values.get("start_time_ms")
-        end = values.get("end_time_ms")
-        if "duration_ms" not in values and start is not None and end is not None:
-            values["duration_ms"] = end - start
-        values.setdefault("provenance", {})
         for key in ("point_refs", "raw_order", "processed_order", "quality_flags"):
             if isinstance(values.get(key), list):
                 values[key] = tuple(values[key])
+        if "duration_ms" not in values and values.get("start_time_ms") is not None and values.get("end_time_ms") is not None:
+            values["duration_ms"] = values["end_time_ms"] - values["start_time_ms"]
         return values
 
     @model_validator(mode="after")

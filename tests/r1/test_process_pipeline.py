@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from datiao.r1.event import detect_student_process_events
 from datiao.r1.mapper import StrokeMapping, map_strokes_to_regions
 from datiao.r1.models import QuestionRegion
+from datiao.r1.models.legacy import legacy_rectangle
 from datiao.r1.pipeline import run_r1_pipeline
 from datiao.r1.parser import (
     CanonicalPointAdapterError,
@@ -32,14 +33,7 @@ def record(point_id, timestamp_ms, x, y, *, session_id="s-1", page_id="p-1", seq
 
 
 def region(region_id, question_id, page_id="p-1", x=0.0, y=0.0, width=10.0, height=10.0, priority=0):
-    return QuestionRegion(
-        region_id=region_id,
-        page_id=page_id,
-        question_id=question_id,
-        geometry_type="rectangle",
-        coordinates=(x, y, width, height),
-        priority=priority,
-    )
+    return legacy_rectangle(region_id=region_id, page_id=page_id, question_id=question_id, x=x, y=y, width=width, height=height, priority=priority)
 
 
 def pipeline(actions):
@@ -130,7 +124,7 @@ def test_same_question_new_stroke_is_only_a_revision_candidate():
 def test_trace_rejects_missing_declared_source():
     points, strokes, mappings = pipeline([("p-1", 2.0, 2.0)])
     event = detect_student_process_events(mappings)[0].model_copy(
-        update={"source_point_ids": ("missing-point",)}
+        update={"point_refs": ("missing-point",)}
     )
 
     with pytest.raises(TraceResolutionError, match="missing-point"):
@@ -174,24 +168,24 @@ def test_stroke_gap_config_requires_integer():
 
 
 def test_question_region_validates_geometry():
-    with pytest.raises(ValidationError, match="rectangle coordinates"):
+    with pytest.raises(ValidationError):
         QuestionRegion(
             region_id="r1",
             page_id="p1",
             question_id="q1",
-            geometry_type="rectangle",
-            coordinates=(0.0, 0.0, 1.0),
+            region_type="rectangle",
+            polygon_norm=((0.0, 0.0), (1.0, 0.0), (1.0, 1.0)),
         )
 
     polygon = QuestionRegion(
         region_id="poly",
         page_id="p1",
         question_id="q1",
-        geometry_type="polygon",
-        coordinates=(0.0, 0.0, 10.0, 0.0, 5.0, 10.0),
+        region_type="polygon",
+        polygon_norm=((0.0, 0.0), (1.0, 0.0), (0.5, 1.0)),
     )
-    assert polygon.contains(5.0, 5.0)
-    assert not polygon.contains(0.0, 11.0)
+    assert polygon.contains(0.5, 0.5)
+    assert not polygon.contains(0.0, 1.1)
 
 
 def test_unified_pipeline_propagates_contract_fields_and_trace():

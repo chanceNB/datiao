@@ -47,32 +47,32 @@ def map_strokes_to_regions(
             results.append(_unknown_mapping(stroke, source_point_ids, flags))
             continue
 
-        valid_points = [
-            point
-            for point in referenced_points
-            if point.normalized.x is not None and point.normalized.y is not None
-        ]
-        if not valid_points:
-            results.append(
-                _unknown_mapping(stroke, source_point_ids, ["NO_VALID_COORDINATES"])
-            )
-            continue
-
         candidates: list[tuple[float, int, str, QuestionRegion]] = []
+        saw_norm_without_coords = False
         for region in region_list:
             if region.page_id != stroke.page_id:
                 continue
+            coordinates: list[tuple[float, float]] = []
+            for point in referenced_points:
+                if region.coordinate_space == "norm":
+                    if point.x_norm is None or point.y_norm is None:
+                        saw_norm_without_coords = True
+                        continue
+                    coordinates.append((point.x_norm, point.y_norm))
+                elif point.x_raw is not None and point.y_raw is not None:
+                    coordinates.append((point.x_raw, point.y_raw))
+            if not coordinates:
+                continue
             inside = sum(
-                region.contains(point.normalized.x, point.normalized.y)
-                for point in valid_points
+                region.contains(x, y) for x, y in coordinates
             )
-            coverage = inside / len(valid_points)
+            coverage = inside / len(coordinates)
             if coverage >= min_coverage:
                 candidates.append((coverage, region.priority, region.region_id, region))
 
         if not candidates:
             results.append(
-                _unknown_mapping(stroke, source_point_ids, ["NO_REGION_MATCH"])
+                _unknown_mapping(stroke, source_point_ids, ["NO_NORMALIZED_COORDINATES" if saw_norm_without_coords else "NO_REGION_MATCH"])
             )
             continue
 

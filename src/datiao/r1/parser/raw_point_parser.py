@@ -127,6 +127,16 @@ def parse_raw_points(records: Iterable[Mapping[str, Any]]) -> tuple[Point, ...]:
         if timestamp_ms is not None:
             previous_timestamps[group_key] = timestamp_ms
 
+        x_norm = _as_coordinate(record.get("x_norm"))
+        y_norm = _as_coordinate(record.get("y_norm"))
+        if (
+            (x_norm is None) != (y_norm is None)
+            or (x_norm is not None and not 0 <= x_norm <= 1)
+            or (y_norm is not None and not 0 <= y_norm <= 1)
+        ):
+            flags.append("INVALID_NORM_COORDINATE")
+            x_norm = None
+            y_norm = None
         raw_payload = freeze_json(record)
         pen_state_raw = record.get("pen_state_raw", record.get("pen_state"))
         pen_state = pen_state_raw if pen_state_raw in {"DOWN", "MOVE", "UP", "UNKNOWN"} else "UNKNOWN"
@@ -148,8 +158,8 @@ def parse_raw_points(records: Iterable[Mapping[str, Any]]) -> tuple[Point, ...]:
                 y_raw=y,
                 x_mm=_as_coordinate(record.get("x_mm")),
                 y_mm=_as_coordinate(record.get("y_mm")),
-                x_norm=_as_coordinate(record.get("x_norm")),
-                y_norm=_as_coordinate(record.get("y_norm")),
+                x_norm=x_norm,
+                y_norm=y_norm,
                 pressure_raw=_as_optional_float(_nested_value(record, "pressure_raw")) if "pressure_raw" in record else _as_optional_float(_nested_value(record, "pressure")),
                 pressure_norm=_as_optional_float(record.get("pressure_norm")),
                 pen_state_raw=pen_state_raw,

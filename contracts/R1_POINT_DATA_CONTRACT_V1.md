@@ -31,8 +31,9 @@ Synthetic events with `dataset_type=synthetic` require `dataset_type`, `generato
 
 ## Breaking migration and compatibility
 
-V1 standard objects do not serialize legacy fields such as `occurred_at_ms`, `source_point_ids` or `source_stroke_ids`. Existing R1 call sites may use read-only compatibility properties and input migration helpers; device aliases still require explicit adapters. No adapter guesses physical calibration or device-specific time semantics.
+V1 standard objects do not serialize legacy fields such as `occurred_at_ms`, `source_point_ids` or `source_stroke_ids`. Legacy payloads must go through named helpers in `datiao.r1.models.legacy`; V1 models reject legacy constructor fields. Read-only aliases remain only for internal trace compatibility. Device aliases still require explicit adapters. No adapter guesses physical calibration or device-specific time semantics.
 
 ## Feature boundary
 
 Provenance, scenario and truth metadata are audit data. A future Feature Builder must use a whitelist and must not flatten `model_dump()` wholesale into training features. R1-05 owns algorithm semantic upgrades such as arc-length mapping, IoU revision and timeout process-end.
+

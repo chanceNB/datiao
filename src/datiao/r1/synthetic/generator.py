@@ -70,34 +70,10 @@ def _action_plan(scenario: Scenario) -> tuple[_Action, ...]:
 
 def default_regions() -> tuple[QuestionRegion, ...]:
     return (
-        QuestionRegion(
-            region_id="region-q-01",
-            page_id="page-01",
-            question_id="q-01",
-            geometry_type="rectangle",
-            coordinates=(0.0, 0.0, 10.0, 10.0),
-        ),
-        QuestionRegion(
-            region_id="region-q-02",
-            page_id="page-01",
-            question_id="q-02",
-            geometry_type="rectangle",
-            coordinates=(20.0, 0.0, 10.0, 10.0),
-        ),
-        QuestionRegion(
-            region_id="region-q-03",
-            page_id="page-01",
-            question_id="q-03",
-            geometry_type="rectangle",
-            coordinates=(40.0, 0.0, 10.0, 10.0),
-        ),
-        QuestionRegion(
-            region_id="region-q-04",
-            page_id="page-02",
-            question_id="q-04",
-            geometry_type="rectangle",
-            coordinates=(0.0, 0.0, 10.0, 10.0),
-        ),
+        QuestionRegion(region_id="region-q-01", page_id="page-01", question_id="q-01", region_type="rectangle", polygon_norm=((0.0, 0.0), (0.1, 0.0), (0.1, 0.1), (0.0, 0.1))),
+        QuestionRegion(region_id="region-q-02", page_id="page-01", question_id="q-02", region_type="rectangle", polygon_norm=((0.2, 0.0), (0.3, 0.0), (0.3, 0.1), (0.2, 0.1))),
+        QuestionRegion(region_id="region-q-03", page_id="page-01", question_id="q-03", region_type="rectangle", polygon_norm=((0.4, 0.0), (0.5, 0.0), (0.5, 0.1), (0.4, 0.1))),
+        QuestionRegion(region_id="region-q-04", page_id="page-02", question_id="q-04", region_type="rectangle", polygon_norm=((0.0, 0.0), (0.1, 0.0), (0.1, 0.1), (0.0, 0.1))),
     )
 
 
@@ -116,6 +92,8 @@ def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
             sequence = action_index * 2 + point_index
             if action.out_of_order and point_index == 1:
                 sequence -= 2
+            x_value = action.x + rng.uniform(-0.5, 0.5)
+            y_value = action.y + rng.uniform(-0.5, 0.5)
             records.append(
                 {
                     "point_id": point_id,
@@ -123,8 +101,10 @@ def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
                     "participant_id": "sim_p_001",
                     "task_segment_id": "sim_segment_practice_01",
                     "page_id": action.page_id,
-                    "x": action.x + rng.uniform(-0.5, 0.5),
-                    "y": action.y + rng.uniform(-0.5, 0.5),
+                    "x": x_value,
+                    "y": y_value,
+                    "x_norm": x_value / 100.0,
+                    "y_norm": y_value / 100.0,
                     "timestamp_ms": timestamp,
                     "sequence": sequence,
                     "scenario_id": scenario.scenario_id,

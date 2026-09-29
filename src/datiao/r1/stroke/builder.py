@@ -54,12 +54,13 @@ def _bbox(points: tuple[Point, ...]) -> BoundingBox:
     valid = [
         point
         for point in points
-        if point.normalized.x is not None and point.normalized.y is not None
+        if (point.x_norm is not None and point.y_norm is not None)
+        or (point.x_raw is not None and point.y_raw is not None)
     ]
     if not valid:
         return BoundingBox(x=0.0, y=0.0, width=0.0, height=0.0)
-    xs = [point.normalized.x for point in valid]
-    ys = [point.normalized.y for point in valid]
+    xs = [point.x_norm if point.x_norm is not None else point.x_raw for point in valid]
+    ys = [point.y_norm if point.y_norm is not None else point.y_raw for point in valid]
     assert all(value is not None for value in xs + ys)
     min_x, max_x = min(xs), max(xs)
     min_y, max_y = min(ys), max(ys)

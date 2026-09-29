@@ -29,7 +29,7 @@ class Point(BaseModel):
 
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
 
-    schema_version: str = Field(default="1.0.0", min_length=1)
+    schema_version: Literal["1.0.0"] = "1.0.0"
     point_id: str = Field(min_length=1)
     session_id: str = Field(min_length=1)
     participant_id: str | None = None
@@ -58,29 +58,12 @@ class Point(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def migrate_legacy_shape(cls, data: Any) -> Any:
-        """Accept old internal construction while keeping V1 output fields only."""
+    def prepare_payload_hash(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
         values = dict(data)
-        normalized = values.pop("normalized", None)
-        if normalized is not None:
-            values.setdefault("x_raw", getattr(normalized, "x", None) if not isinstance(normalized, dict) else normalized.get("x"))
-            values.setdefault("y_raw", getattr(normalized, "y", None) if not isinstance(normalized, dict) else normalized.get("y"))
-            values.setdefault("timestamp_ms", getattr(normalized, "timestamp_ms", None) if not isinstance(normalized, dict) else normalized.get("timestamp_ms"))
-            values.setdefault("pressure_raw", getattr(normalized, "pressure", None) if not isinstance(normalized, dict) else normalized.get("pressure"))
-        raw_index = values.pop("raw_index", None)
-        if raw_index is not None:
-            values.setdefault("source_index", raw_index)
-            values.setdefault("raw_order", raw_index)
-            values.setdefault("processed_order", raw_index)
-        values.setdefault("source_index", values.get("sequence", 0))
-        values.setdefault("raw_order", values["source_index"])
-        values.setdefault("processed_order", values["source_index"])
-        values.setdefault("source_payload", {})
-        values.setdefault("source_payload_hash", stable_json_hash(values["source_payload"]))
-        if "sequence" not in values:
-            values["sequence"] = values["source_index"]
+        if "source_payload" in values and "source_payload_hash" not in values:
+            values["source_payload_hash"] = stable_json_hash(values["source_payload"])
         if isinstance(values.get("quality_flags"), list):
             values["quality_flags"] = tuple(values["quality_flags"])
         return values
@@ -113,9 +96,4 @@ class Point(BaseModel):
 
     @property
     def normalized(self) -> NormalizedPoint:
-        return NormalizedPoint(
-            x=self.x_raw,
-            y=self.y_raw,
-            timestamp_ms=self.timestamp_ms,
-            pressure=float(self.pressure_raw) if self.pressure_raw is not None else None,
-        )
+        return NormalizedPoint(x=self.x_raw, y=self.y_raw, timestamp_ms=self.timestamp_ms, pressure=float(self.pressure_raw) if self.pressure_raw is not None else None)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from numbers import Real
+import math
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -12,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class QuestionRegion(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
 
-    schema_version: str = Field(default="1.0.0", min_length=1)
+    schema_version: Literal["1.0.0"] = "1.0.0"
     region_id: str = Field(min_length=1)
     page_id: str = Field(min_length=1)
     question_id: str = Field(min_length=1)
@@ -23,26 +24,10 @@ class QuestionRegion(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def migrate_legacy_shape(cls, data: Any) -> Any:
+    def prepare_json_polygon(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
         values = dict(data)
-        if "geometry_type" in values:
-            geometry_type = values.pop("geometry_type")
-            coordinates = values.pop("coordinates", ())
-            if not isinstance(coordinates, Sequence) or isinstance(coordinates, (str, bytes, bytearray)):
-                return values
-            numbers = tuple(float(item) for item in coordinates)
-            if geometry_type == "rectangle" and len(numbers) != 4:
-                raise ValueError("rectangle coordinates must be (x, y, width, height)")
-            if geometry_type == "rectangle" and len(numbers) == 4:
-                x, y, width, height = numbers
-                polygon = ((x, y), (x + width, y), (x + width, y + height), (x, y + height))
-            else:
-                polygon = tuple(zip(numbers[::2], numbers[1::2], strict=True))
-            values["region_type"] = geometry_type
-            values["polygon_norm"] = polygon
-            values["coordinate_space"] = "legacy"
         if isinstance(values.get("polygon_norm"), list):
             values["polygon_norm"] = tuple(tuple(point) for point in values["polygon_norm"])
         return values
@@ -54,7 +39,7 @@ class QuestionRegion(BaseModel):
         if self.region_type == "rectangle" and len(self.polygon_norm) != 4:
             raise ValueError("rectangle polygon_norm must contain four points")
         for point in self.polygon_norm:
-            if len(point) != 2 or any(isinstance(value, bool) or not isinstance(value, Real) for value in point):
+            if len(point) != 2 or any(isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(float(value)) for value in point):
                 raise ValueError("polygon_norm points must contain finite numbers")
             if self.coordinate_space == "norm" and any(value < 0 or value > 1 for value in point):
                 raise ValueError("polygon_norm coordinates must be between 0 and 1")

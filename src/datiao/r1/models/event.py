@@ -26,7 +26,7 @@ QualityStatus = Literal["VALID", "DEGRADED", "INVALID"]
 class StudentProcessEvent(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
 
-    schema_version: str = Field(default="1.0.0", min_length=1)
+    schema_version: Literal["1.0.0"] = "1.0.0"
     event_id: str = Field(min_length=1)
     event_type: EventType
     session_id: str = Field(min_length=1)
@@ -51,28 +51,10 @@ class StudentProcessEvent(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def migrate_legacy_shape(cls, data: Any) -> Any:
+    def prepare_json_arrays(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
         values = dict(data)
-        if "provenance" not in values and "source_provenance" in values:
-            values["provenance"] = values.pop("source_provenance")
-        if "start_time_ms" not in values and "occurred_at_ms" in values:
-            values["start_time_ms"] = values["occurred_at_ms"]
-        if "end_time_ms" not in values and "occurred_at_ms" in values:
-            values["end_time_ms"] = values["occurred_at_ms"]
-        if "point_refs" not in values and "source_point_ids" in values:
-            values["point_refs"] = values.pop("source_point_ids")
-        if "stroke_refs" not in values and "source_stroke_ids" in values:
-            values["stroke_refs"] = values.pop("source_stroke_ids")
-        values.pop("occurred_at_ms", None)
-        values.pop("source_point_ids", None)
-        values.pop("source_stroke_ids", None)
-        values.setdefault("schema_version", "1.0.0")
-        values.setdefault("sequence", 0)
-        values.setdefault("start_time_ms", None)
-        values.setdefault("end_time_ms", values.get("start_time_ms"))
-        values.setdefault("provenance", {})
         for key in ("point_refs", "stroke_refs", "quality_flags"):
             if isinstance(values.get(key), list):
                 values[key] = tuple(values[key])
@@ -82,6 +64,8 @@ class StudentProcessEvent(BaseModel):
     def validate_contract(self) -> "StudentProcessEvent":
         if self.start_time_ms is not None and self.end_time_ms is not None and self.end_time_ms < self.start_time_ms:
             raise ValueError("end_time_ms must be greater than or equal to start_time_ms")
+        if self.event_type in {"WRITING", "QUESTION_VISIT", "QUESTION_LEAVE", "RETURN", "REVISION_CANDIDATE"} and not (self.point_refs or self.stroke_refs):
+            raise ValueError("this event type requires point_refs or stroke_refs")
         if isinstance(self.provenance, dict) and self.provenance.get("dataset_type") == "synthetic":
             required = {"dataset_type", "generator_version", "seed", "scenario_id", "ground_truth_source", "manifest_hash"}
             missing = sorted(required.difference(self.provenance))
