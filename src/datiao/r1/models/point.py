@@ -1,15 +1,19 @@
-"""Immutable raw pen point models."""
+"""Immutable canonical point and raw provenance models."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .immutable import freeze_json, stable_json_hash
 
+PenState = Literal["DOWN", "MOVE", "UP", "UNKNOWN"]
+
 
 class NormalizedPoint(BaseModel):
+    """Legacy view retained as a read-only compatibility property."""
+
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
 
     x: float | None
@@ -21,33 +25,97 @@ class NormalizedPoint(BaseModel):
 
 
 class Point(BaseModel):
-    """A raw point whose source payload and identity cannot be overwritten."""
+    """Canonical Point V1 with immutable raw provenance."""
 
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
 
+    schema_version: str = Field(default="1.0.0", min_length=1)
     point_id: str = Field(min_length=1)
     session_id: str = Field(min_length=1)
+    participant_id: str | None = None
+    task_segment_id: str | None = None
+    device_id: str | None = None
     page_id: str | None = None
-    raw_index: int = Field(ge=0)
-    normalized: NormalizedPoint
+    sequence: int = Field(ge=0)
+    timestamp_ms: int | None
+    x_raw: float | None
+    y_raw: float | None
+    x_mm: float | None = None
+    y_mm: float | None = None
+    x_norm: float | None = Field(default=None, ge=0, le=1)
+    y_norm: float | None = Field(default=None, ge=0, le=1)
+    pressure_raw: float | int | None = None
+    pressure_norm: float | None = Field(default=None, ge=0, le=1)
+    pen_state_raw: Any = None
+    pen_state: PenState = "UNKNOWN"
+    source_file: str | None = None
+    source_index: int = Field(ge=0)
+    raw_order: int = Field(ge=0)
+    processed_order: int = Field(ge=0)
     source_payload: Any
     source_payload_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     quality_flags: tuple[str, ...] = ()
 
     @model_validator(mode="before")
     @classmethod
-    def calculate_source_hash(cls, data: Any) -> Any:
-        if not isinstance(data, dict) or "source_payload" not in data:
+    def migrate_legacy_shape(cls, data: Any) -> Any:
+        """Accept old internal construction while keeping V1 output fields only."""
+        if not isinstance(data, dict):
             return data
         values = dict(data)
-        expected_hash = stable_json_hash(values["source_payload"])
-        supplied_hash = values.get("source_payload_hash")
-        if supplied_hash is not None and supplied_hash != expected_hash:
-            raise ValueError("source_payload_hash does not match source_payload")
-        values["source_payload_hash"] = expected_hash
+        normalized = values.pop("normalized", None)
+        if normalized is not None:
+            values.setdefault("x_raw", getattr(normalized, "x", None) if not isinstance(normalized, dict) else normalized.get("x"))
+            values.setdefault("y_raw", getattr(normalized, "y", None) if not isinstance(normalized, dict) else normalized.get("y"))
+            values.setdefault("timestamp_ms", getattr(normalized, "timestamp_ms", None) if not isinstance(normalized, dict) else normalized.get("timestamp_ms"))
+            values.setdefault("pressure_raw", getattr(normalized, "pressure", None) if not isinstance(normalized, dict) else normalized.get("pressure"))
+        raw_index = values.pop("raw_index", None)
+        if raw_index is not None:
+            values.setdefault("source_index", raw_index)
+            values.setdefault("raw_order", raw_index)
+            values.setdefault("processed_order", raw_index)
+        values.setdefault("source_index", values.get("sequence", 0))
+        values.setdefault("raw_order", values["source_index"])
+        values.setdefault("processed_order", values["source_index"])
+        values.setdefault("source_payload", {})
+        values.setdefault("source_payload_hash", stable_json_hash(values["source_payload"]))
+        if "sequence" not in values:
+            values["sequence"] = values["source_index"]
+        if isinstance(values.get("quality_flags"), list):
+            values["quality_flags"] = tuple(values["quality_flags"])
         return values
+
+    @model_validator(mode="after")
+    def validate_norm_pair(self) -> "Point":
+        if (self.x_norm is None) != (self.y_norm is None):
+            raise ValueError("x_norm and y_norm must be provided together")
+        return self
 
     @field_validator("source_payload", mode="before")
     @classmethod
     def freeze_source_payload(cls, value: Any) -> Any:
         return freeze_json(value)
+
+    @field_validator("source_payload_hash", mode="before")
+    @classmethod
+    def validate_source_hash(cls, value: Any, info: Any) -> Any:
+        payload = info.data.get("source_payload")
+        expected = stable_json_hash(payload) if payload is not None else value
+        if value is None:
+            return expected
+        if value != expected:
+            raise ValueError("source_payload_hash does not match source_payload")
+        return value
+
+    @property
+    def raw_index(self) -> int:
+        return self.source_index
+
+    @property
+    def normalized(self) -> NormalizedPoint:
+        return NormalizedPoint(
+            x=self.x_raw,
+            y=self.y_raw,
+            timestamp_ms=self.timestamp_ms,
+            pressure=float(self.pressure_raw) if self.pressure_raw is not None else None,
+        )

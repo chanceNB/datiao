@@ -1,0 +1,35 @@
+{
+  "algorithm_version": "r1-event-rule-v0.1",
+  "data_version": null,
+  "end_time_ms": 18740,
+  "event_id": "sim_evt_000001",
+  "event_type": "RETURN",
+  "mapping_confidence": null,
+  "metadata": {},
+  "next_question_id": null,
+  "page_id": null,
+  "participant_id": "sim_p_001",
+  "point_refs": [
+    "point_001231"
+  ],
+  "previous_question_id": null,
+  "provenance": {
+    "dataset_type": "synthetic",
+    "generator_version": "pen-sim-v0.1",
+    "ground_truth_source": "scenario_plan",
+    "manifest_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "scenario_id": "sim_return_q5_001",
+    "seed": 20260929
+  },
+  "quality_flags": [],
+  "quality_status": "VALID",
+  "question_id": "Q05",
+  "schema_version": "1.0.0",
+  "sequence": 0,
+  "session_id": "sim_session_001",
+  "start_time_ms": 18320,
+  "stroke_refs": [
+    "stroke_000087"
+  ],
+  "task_segment_id": "sim_segment_practice_01"
+}

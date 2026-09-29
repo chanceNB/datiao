@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datiao.local/contracts/stroke.schema.json",
+  "title": "R1 Stroke V1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "stroke_id", "session_id", "participant_id", "task_segment_id", "page_id", "point_refs", "raw_order", "processed_order", "start_time_ms", "end_time_ms", "duration_ms", "bbox", "quality_flags", "algorithm_version", "provenance"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"}, "stroke_id": {"type": "string", "minLength": 1}, "session_id": {"type": "string", "minLength": 1},
+    "participant_id": {"type": ["string", "null"]}, "task_segment_id": {"type": ["string", "null"]}, "page_id": {"type": ["string", "null"]},
+    "point_refs": {"type": "array", "items": {"type": "string", "minLength": 1}}, "raw_order": {"type": "array", "items": {"type": "string"}}, "processed_order": {"type": "array", "items": {"type": "string"}},
+    "start_time_ms": {"type": ["integer", "null"]}, "end_time_ms": {"type": ["integer", "null"]}, "duration_ms": {"type": ["integer", "null"], "minimum": 0},
+    "bbox": {"type": "object", "additionalProperties": false, "required": ["x", "y", "width", "height"], "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "width": {"type": "number", "minimum": 0}, "height": {"type": "number", "minimum": 0}}},
+    "quality_flags": {"type": "array", "items": {"type": "string"}}, "algorithm_version": {"type": "string", "minLength": 1}, "provenance": {}
+  }
+}

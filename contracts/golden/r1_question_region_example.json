@@ -1,0 +1,23 @@
+{
+  "coordinate_space": "norm",
+  "page_id": "page_01",
+  "polygon_norm": [
+    [
+      0.1,
+      0.1
+    ],
+    [
+      0.3,
+      0.1
+    ],
+    [
+      0.2,
+      0.3
+    ]
+  ],
+  "priority": 0,
+  "question_id": "Q05",
+  "region_id": "region_q5",
+  "region_type": "polygon",
+  "schema_version": "1.0.0"
+}

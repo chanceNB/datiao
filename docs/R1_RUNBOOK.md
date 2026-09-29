@@ -9,7 +9,7 @@ $env:PYTHONPATH = "src"
 python -m pytest
 ```
 
-当前 R1 专项和回归测试共 39 个。真实设备字段尚未冻结时，只能传入以下规范化字段：
+当前仓库全量测试以实际 pytest 输出为准；本任务完成时为 51 个。真实设备字段尚未冻结时，只能传入以下规范化字段：
 
 ```text
 point_id, session_id, page_id, timestamp_ms, x, y, sequence
@@ -63,3 +63,19 @@ python -c "from datiao.r1.synthetic import Scenario, generate_synthetic_case; c=
 ```
 
 算法输出和独立真值分别存放在 `algorithm_output` 与 `truth`，不能用算法输出生成真值。
+
+## Contract V1（TASK-R1-04）
+
+标准输出版本为 `1.0.0`，schema 位于 `contracts/`。下游读取 `Point` 的 raw/mm/norm 坐标、`Stroke.point_refs`、`QuestionRegion.polygon_norm` 和 Event 的 `start_time_ms/end_time_ms`、`point_refs/stroke_refs`。旧 `occurred_at_ms` 与 `source_*_ids` 只用于迁移兼容，不会出现在标准 `model_dump()`。
+
+Synthetic 使用 `sim_session_...`、`sim_p_...`、`sim_segment_...`，每个 Session 从 0ms 开始；Synthetic provenance 必须带六个字段和实际 SHA-256 manifest hash。`quality_status` 是总状态，`quality_flags` 是原因；UNKNOWN 事件不表示数据 INVALID。
+
+Contract 专项测试：
+
+```powershell
+$py = "C:\Users\ZhuanZ（无密码）\AppData\Local\Programs\Python\Python314\python.exe"
+& $py -m pytest tests/contracts -q
+& $py -m pytest tests/r1 -q
+& $py -m pytest
+```
+

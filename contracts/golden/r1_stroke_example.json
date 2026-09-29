@@ -1,0 +1,31 @@
+{
+  "algorithm_version": "r1-stroke-rule-v1",
+  "bbox": {
+    "height": 0.0,
+    "width": 0.0,
+    "x": 12.5,
+    "y": 8.0
+  },
+  "duration_ms": 0,
+  "end_time_ms": 10,
+  "page_id": "page_01",
+  "participant_id": "sim_p_001",
+  "point_refs": [
+    "point_001231"
+  ],
+  "processed_order": [
+    "point_001231"
+  ],
+  "provenance": {
+    "builder": "fixture"
+  },
+  "quality_flags": [],
+  "raw_order": [
+    "point_001231"
+  ],
+  "schema_version": "1.0.0",
+  "session_id": "sim_session_001",
+  "start_time_ms": 10,
+  "stroke_id": "stroke_000087",
+  "task_segment_id": "sim_segment_practice_01"
+}

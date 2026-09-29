@@ -1,0 +1,32 @@
+{
+  "device_id": "wifi_pen",
+  "page_id": "page_01",
+  "participant_id": "sim_p_001",
+  "pen_state": "DOWN",
+  "pen_state_raw": "DOWN",
+  "point_id": "point_001231",
+  "pressure_norm": null,
+  "pressure_raw": 0,
+  "processed_order": 0,
+  "quality_flags": [],
+  "raw_order": 0,
+  "schema_version": "1.0.0",
+  "sequence": 0,
+  "session_id": "sim_session_001",
+  "source_file": "fixture.jsonl",
+  "source_index": 0,
+  "source_payload": {
+    "point_id": "point_001231",
+    "x": 12.5,
+    "y": 8.0
+  },
+  "source_payload_hash": "08d8ae2d4f615755ede6532d16479425c09e416af1bd0f475fcec34c39857854",
+  "task_segment_id": "sim_segment_practice_01",
+  "timestamp_ms": 10,
+  "x_mm": null,
+  "x_norm": null,
+  "x_raw": 12.5,
+  "y_mm": null,
+  "y_norm": null,
+  "y_raw": 8.0
+}

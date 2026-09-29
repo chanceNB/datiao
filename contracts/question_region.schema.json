@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datiao.local/contracts/question_region.schema.json",
+  "title": "R1 QuestionRegion V1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "region_id", "page_id", "question_id", "region_type", "polygon_norm", "priority", "coordinate_space"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"}, "region_id": {"type": "string", "minLength": 1}, "page_id": {"type": "string", "minLength": 1}, "question_id": {"type": "string", "minLength": 1},
+    "region_type": {"enum": ["rectangle", "polygon"]}, "polygon_norm": {"type": "array", "minItems": 3, "items": {"type": "array", "prefixItems": [{"type": "number", "minimum": 0, "maximum": 1}, {"type": "number", "minimum": 0, "maximum": 1}], "items": false, "minItems": 2, "maxItems": 2}},
+    "priority": {"type": "integer"}, "coordinate_space": {"enum": ["norm", "legacy"]}
+  }
+}

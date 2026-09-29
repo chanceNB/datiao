@@ -94,14 +94,16 @@ def map_strokes_to_regions(
             StrokeMapping(
                 stroke_id=stroke.stroke_id,
                 session_id=stroke.session_id,
+                participant_id=stroke.participant_id,
+                task_segment_id=stroke.task_segment_id,
                 page_id=stroke.page_id,
                 question_id=region.question_id,
                 region_id=region_id,
                 status="MAPPED",
                 confidence=coverage,
-                start_timestamp_ms=stroke.start_timestamp_ms,
-                end_timestamp_ms=stroke.end_timestamp_ms,
-                source_point_ids=source_point_ids,
+                start_time_ms=stroke.start_time_ms,
+                end_time_ms=stroke.end_time_ms,
+                point_refs=source_point_ids,
             )
         )
     return tuple(results)
@@ -115,10 +117,13 @@ def _unknown_mapping(
     return StrokeMapping(
         stroke_id=stroke.stroke_id,
         session_id=stroke.session_id,
+        participant_id=stroke.participant_id,
+        task_segment_id=stroke.task_segment_id,
         page_id=stroke.page_id,
         status="UNKNOWN",
-        start_timestamp_ms=stroke.start_timestamp_ms,
-        end_timestamp_ms=stroke.end_timestamp_ms,
-        source_point_ids=source_point_ids,
+        start_time_ms=stroke.start_time_ms,
+        end_time_ms=stroke.end_time_ms,
+        point_refs=source_point_ids,
         quality_flags=tuple(dict.fromkeys(flags)),
     )
+

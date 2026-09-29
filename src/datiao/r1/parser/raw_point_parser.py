@@ -88,8 +88,12 @@ def parse_raw_points(records: Iterable[Mapping[str, Any]]) -> tuple[Point, ...]:
         point_id = record["point_id"]
         session_id = record["session_id"]
         page_id = record.get("page_id")
-        x = _as_coordinate(_nested_value(record, "x"))
-        y = _as_coordinate(_nested_value(record, "y"))
+        x = _as_coordinate(_nested_value(record, "x_raw"))
+        if x is None:
+            x = _as_coordinate(_nested_value(record, "x"))
+        y = _as_coordinate(_nested_value(record, "y_raw"))
+        if y is None:
+            y = _as_coordinate(_nested_value(record, "y"))
         timestamp_value = _nested_value(record, "timestamp_ms")
         timestamp_ms = _as_timestamp(timestamp_value)
         flags: list[str] = []
@@ -124,20 +128,36 @@ def parse_raw_points(records: Iterable[Mapping[str, Any]]) -> tuple[Point, ...]:
             previous_timestamps[group_key] = timestamp_ms
 
         raw_payload = freeze_json(record)
+        pen_state_raw = record.get("pen_state_raw", record.get("pen_state"))
+        pen_state = pen_state_raw if pen_state_raw in {"DOWN", "MOVE", "UP", "UNKNOWN"} else "UNKNOWN"
+        source_index = record.get("source_index", raw_index)
+        if isinstance(source_index, bool) or not isinstance(source_index, int) or source_index < 0:
+            source_index = raw_index
         points.append(
             Point(
+                schema_version=str(record.get("schema_version", "1.0.0")),
                 point_id=str(point_id),
                 session_id=str(session_id),
+                participant_id=record.get("participant_id"),
+                task_segment_id=record.get("task_segment_id"),
+                device_id=record.get("device_id"),
                 page_id=str(page_id) if page_id is not None else None,
-                raw_index=raw_index,
-                normalized={
-                    "x": x,
-                    "y": y,
-                    "timestamp_ms": timestamp_ms,
-                    "pressure": _as_optional_float(_nested_value(record, "pressure")),
-                    "tilt_x": _as_optional_float(_nested_value(record, "tilt_x")),
-                    "tilt_y": _as_optional_float(_nested_value(record, "tilt_y")),
-                },
+                sequence=int(sequence) if isinstance(sequence, (int, float)) and float(sequence).is_integer() else raw_index,
+                timestamp_ms=timestamp_ms,
+                x_raw=x,
+                y_raw=y,
+                x_mm=_as_coordinate(record.get("x_mm")),
+                y_mm=_as_coordinate(record.get("y_mm")),
+                x_norm=_as_coordinate(record.get("x_norm")),
+                y_norm=_as_coordinate(record.get("y_norm")),
+                pressure_raw=_as_optional_float(_nested_value(record, "pressure_raw")) if "pressure_raw" in record else _as_optional_float(_nested_value(record, "pressure")),
+                pressure_norm=_as_optional_float(record.get("pressure_norm")),
+                pen_state_raw=pen_state_raw,
+                pen_state=pen_state,
+                source_file=record.get("source_file"),
+                source_index=source_index,
+                raw_order=raw_index,
+                processed_order=raw_index,
                 source_payload=raw_payload,
                 quality_flags=tuple(flags),
             )

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from ..event import detect_student_process_events
 from ..mapper import map_strokes_to_regions
 from ..models import Point, QuestionRegion
+from ..models.immutable import stable_json_hash
 from ..parser import parse_raw_points
 from ..stroke import build_strokes
 from .models import (
@@ -106,10 +107,10 @@ def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
     point_counter = 0
     for action_index, action in enumerate(_action_plan(scenario)):
         for point_index in range(2):
-            point_id = f"{scenario.scenario_id}-p-{point_counter:03d}"
+            point_id = f"sim_{scenario.scenario_id}_point_{point_counter:03d}"
             if action.duplicate_point and point_index == 1:
-                point_id = f"{scenario.scenario_id}-p-{point_counter - 1:03d}"
-            timestamp: int | None = 1_000 + action_index * 2_000 + point_index * 50
+                point_id = f"sim_{scenario.scenario_id}_point_{point_counter - 1:03d}"
+            timestamp: int | None = action_index * 2_000 + point_index * 50
             if action.missing_timestamp and point_index == 0:
                 timestamp = None
             sequence = action_index * 2 + point_index
@@ -118,7 +119,9 @@ def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
             records.append(
                 {
                     "point_id": point_id,
-                    "session_id": f"session-{scenario.scenario_id}",
+                    "session_id": f"sim_session_{scenario.scenario_id}",
+                    "participant_id": "sim_p_001",
+                    "task_segment_id": "sim_segment_practice_01",
                     "page_id": action.page_id,
                     "x": action.x + rng.uniform(-0.5, 0.5),
                     "y": action.y + rng.uniform(-0.5, 0.5),
@@ -155,7 +158,7 @@ def _truth_for(scenario: Scenario, raw_points: tuple[Point, ...]) -> SyntheticTr
         )
         truth_events.append(
             SyntheticTruthEvent(
-                event_id=f"{scenario.scenario_id}-truth-{len(truth_events):04d}",
+                event_id=f"sim_{scenario.scenario_id}_truth_{len(truth_events):04d}",
                 event_type=event_type,
                 page_id=actions[action_index].page_id,
                 question_id=question_id,
@@ -193,11 +196,25 @@ def _truth_for(scenario: Scenario, raw_points: tuple[Point, ...]) -> SyntheticTr
 
 
 def generate_synthetic_case(scenario: Scenario) -> SyntheticCase:
-    raw_points = generate_raw_points(scenario)
+    raw_records = _raw_records(scenario)
+    manifest_hash = f"sha256:{stable_json_hash(raw_records)}"
+    raw_points = parse_raw_points(raw_records)
     regions = default_regions()
     strokes = build_strokes(raw_points)
     mappings = map_strokes_to_regions(strokes, raw_points, regions)
-    events = detect_student_process_events(mappings)
+    provenance = {
+        "dataset_type": "synthetic",
+        "generator_version": scenario.generator_version,
+        "seed": scenario.seed,
+        "scenario_id": scenario.scenario_id,
+        "ground_truth_source": "scenario_plan",
+        "manifest_hash": manifest_hash,
+    }
+    events = detect_student_process_events(
+        mappings,
+        task_segment_id="sim_segment_practice_01",
+        source_provenance=provenance,
+    )
     truth = _truth_for(scenario, raw_points)
     algorithm_output = SyntheticAlgorithmOutput(
         algorithm_version="r1.algorithm.v1",

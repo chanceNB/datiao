@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datiao.local/contracts/point.schema.json",
+  "title": "R1 Canonical Point V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "point_id", "session_id", "participant_id", "task_segment_id", "device_id", "page_id", "sequence", "timestamp_ms", "x_raw", "y_raw", "x_mm", "y_mm", "x_norm", "y_norm", "pressure_raw", "pressure_norm", "pen_state_raw", "pen_state", "source_file", "source_index", "raw_order", "processed_order", "source_payload", "source_payload_hash", "quality_flags"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "point_id": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "minLength": 1},
+    "participant_id": {"type": ["string", "null"]},
+    "task_segment_id": {"type": ["string", "null"]},
+    "device_id": {"type": ["string", "null"]},
+    "page_id": {"type": ["string", "null"]},
+    "sequence": {"type": "integer", "minimum": 0},
+    "timestamp_ms": {"type": ["integer", "null"]},
+    "x_raw": {"type": ["number", "null"]}, "y_raw": {"type": ["number", "null"]},
+    "x_mm": {"type": ["number", "null"]}, "y_mm": {"type": ["number", "null"]},
+    "x_norm": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "y_norm": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "pressure_raw": {"type": ["number", "null"]},
+    "pressure_norm": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "pen_state_raw": {},
+    "pen_state": {"enum": ["DOWN", "MOVE", "UP", "UNKNOWN"]},
+    "source_file": {"type": ["string", "null"]},
+    "source_index": {"type": "integer", "minimum": 0}, "raw_order": {"type": "integer", "minimum": 0}, "processed_order": {"type": "integer", "minimum": 0},
+    "source_payload": {}, "source_payload_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "quality_flags": {"type": "array", "items": {"type": "string"}}
+  }
+}

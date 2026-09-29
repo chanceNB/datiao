@@ -77,13 +77,18 @@ def _make_stroke(stroke_index: int, points: tuple[Point, ...]) -> Stroke:
     return Stroke(
         stroke_id=f"stroke-{stroke_index:04d}",
         session_id=points[0].session_id,
+        participant_id=points[0].participant_id,
+        task_segment_id=points[0].task_segment_id,
         page_id=points[0].page_id,
+        point_refs=tuple(point.point_id for point in points),
         raw_order=tuple(point.point_id for point in points),
         processed_order=_processed_order(points),
-        start_timestamp_ms=min(known_timestamps) if known_timestamps else None,
-        end_timestamp_ms=max(known_timestamps) if known_timestamps else None,
+        start_time_ms=min(known_timestamps) if known_timestamps else None,
+        end_time_ms=max(known_timestamps) if known_timestamps else None,
         bbox=_bbox(points),
         quality_flags=stroke_quality_flags(points),
+        algorithm_version="r1-stroke-rule-v1",
+        provenance={"builder": "stroke_builder"},
     )
 
 

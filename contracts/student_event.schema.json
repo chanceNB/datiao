@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datiao.local/contracts/student_event.schema.json",
+  "title": "R1 Student Process Event V1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "event_id", "event_type", "session_id", "task_segment_id", "participant_id", "question_id", "page_id", "previous_question_id", "next_question_id", "sequence", "start_time_ms", "end_time_ms", "point_refs", "stroke_refs", "quality_status", "quality_flags", "algorithm_version", "provenance", "data_version", "mapping_confidence", "metadata"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"}, "event_id": {"type": "string", "minLength": 1}, "event_type": {"enum": ["WRITING", "QUESTION_VISIT", "QUESTION_LEAVE", "RETURN", "REVISION_CANDIDATE", "PAGE_CHANGE", "PROCESS_END", "UNKNOWN"]}, "session_id": {"type": "string", "minLength": 1},
+    "task_segment_id": {"type": ["string", "null"]}, "participant_id": {"type": ["string", "null"]}, "question_id": {"type": ["string", "null"]}, "page_id": {"type": ["string", "null"]}, "previous_question_id": {"type": ["string", "null"]}, "next_question_id": {"type": ["string", "null"]}, "sequence": {"type": "integer", "minimum": 0},
+    "start_time_ms": {"type": ["integer", "null"]}, "end_time_ms": {"type": ["integer", "null"]}, "point_refs": {"type": "array", "items": {"type": "string"}}, "stroke_refs": {"type": "array", "items": {"type": "string"}}, "quality_status": {"enum": ["VALID", "DEGRADED", "INVALID"]}, "quality_flags": {"type": "array", "items": {"type": "string"}}, "algorithm_version": {"type": "string", "minLength": 1}, "provenance": {}, "data_version": {"type": ["string", "null"]}, "mapping_confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}, "metadata": {}
+  }
+}
