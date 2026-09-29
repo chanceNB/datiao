@@ -4,3 +4,5 @@
 
 
 当前 Feature Manifest hash：sha256:40b0326baf0f71206da1fd14b05c8ab5bdf1473c708735c57c019ea820cf5848；Sequence 为 360（252/54/54 split），values 为 [T,12]，targets 为 [T,8]。
+
+R1-08 baseline reference：`r1-lightgbm-ovr-v1@1.0.0`。TCN 不得使用 LightGBM predictions 作为输入；仍只读取冻结 SequenceSample。
