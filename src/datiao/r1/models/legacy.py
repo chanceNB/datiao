@@ -48,7 +48,7 @@ def legacy_stroke(data: Mapping[str, Any]) -> Stroke:
         point_refs=raw_order, raw_order=raw_order, processed_order=tuple(data.get("processed_order", raw_order)),
         start_time_ms=start, end_time_ms=end, duration_ms=(end - start if start is not None and end is not None else None),
         bbox=BoundingBox.model_validate(data["bbox"]), quality_flags=tuple(data.get("quality_flags", ())),
-        algorithm_version="r1-stroke-rule-v1", provenance={"legacy_adapter": True},
+        algorithm_version="r1-stroke-rule-v2.2", provenance={"legacy_adapter": True, "raw_coordinate_domain": "unknown", "bbox_coordinate_space": "unavailable"},
     )
 
 
@@ -126,5 +126,5 @@ def legacy_event(data: Mapping[str, Any]) -> StudentProcessEvent:
         page_id=data.get("page_id"), sequence=int(data.get("sequence", 0)), start_time_ms=occurred, end_time_ms=occurred,
         point_refs=tuple(data.get("source_point_ids", ())), stroke_refs=tuple(data.get("source_stroke_ids", ())),
         quality_status=quality_status, quality_flags=tuple(dict.fromkeys(quality_flags)),
-        algorithm_version="r1-event-rule-v0.2.1", provenance=data.get("source_provenance", {}), metadata=data.get("metadata", {}),
+        algorithm_version="r1-event-rule-v0.2.2", provenance=data.get("source_provenance", {}), metadata=data.get("metadata", {}),
     )

@@ -30,7 +30,7 @@ def test_pen_state_groups_down_move_up_and_starts_next_contact():
     )
     strokes = build_strokes(points, StrokeBuildConfig(max_spatial_jump_norm=1.0))
     assert [stroke.raw_order for stroke in strokes] == [("a", "b", "c"), ("d", "e")]
-    assert strokes[0].algorithm_version == "r1-stroke-rule-v2"
+    assert strokes[0].algorithm_version == "r1-stroke-rule-v2.2"
     assert strokes[0].provenance["path_length_norm"] > 0
 
 

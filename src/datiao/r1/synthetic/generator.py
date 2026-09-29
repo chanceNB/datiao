@@ -95,6 +95,7 @@ def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
                 "point_id": f"sim_{scenario.scenario_id}_point_{index:03d}",
                 "session_id": f"sim_session_{scenario.scenario_id}",
                 "participant_id": "sim_p_001",
+                "device_id": "sim_pen_001",
                 "task_segment_id": "sim_segment_practice_01",
                 "page_id": "page-01",
                 "x": x * 100.0,
@@ -137,6 +138,7 @@ def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
                     "point_id": point_id,
                     "session_id": f"sim_session_{scenario.scenario_id}",
                     "participant_id": "sim_p_001",
+                    "device_id": "sim_pen_001",
                     "task_segment_id": "sim_segment_practice_01",
                     "page_id": action.page_id,
                     "x": x_value,
@@ -236,6 +238,7 @@ def generate_synthetic_case(scenario: Scenario) -> SyntheticCase:
         participant_id="sim_p_001",
         task_segment_id="sim_segment_practice_01",
         raw_records=raw_records,
+        device_id="sim_pen_001",
     )
     manifest_hash = compute_manifest_hash(manifest)
     raw_points = parse_raw_points(raw_records)

@@ -11,8 +11,9 @@ from ..mapper import StrokeMapping
 from ..models import Point, Stroke, StudentProcessEvent
 
 PROCESS_SCHEMA_VERSION = "1.0.0"
-EVENT_ALGORITHM_VERSION = "r1-event-rule-v0.2.1"
+EVENT_ALGORITHM_VERSION = "r1-event-rule-v0.2.2"
 UNKNOWN_PARTICIPANT_BUCKET = "UNKNOWN_PARTICIPANT"
+UNKNOWN_TASK_SEGMENT_BUCKET = "UNKNOWN_TASK_SEGMENT"
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,7 +39,7 @@ class ParticipantProcessState:
     active_question: str | None = None
     active_mapping: StrokeMapping | None = None
     previous_page_id: str | None = None
-    question_ink_history: dict[tuple[str, str, str, str], list["_StrokeBBox"]] = field(default_factory=dict)
+    question_ink_history: dict[tuple[str, str, str, str, str, str], list["_StrokeBBox"]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +51,7 @@ class _StrokeBBox:
     coordinate_space: str
     page_id: str | None
     participant_id: str | None
+    coordinate_domain: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,25 +80,30 @@ def detect_student_process_events(
     """
 
     active_config = config or EventDetectionConfig()
-    ordered = tuple(sorted(tuple(mappings), key=lambda item: (item.start_time_ms is None, item.start_time_ms if item.start_time_ms is not None else 0, _participant_bucket(item.participant_id), item.stroke_id)))
+    ordered = tuple(sorted(tuple(mappings), key=lambda item: (item.start_time_ms is None, item.start_time_ms if item.start_time_ms is not None else 0, _participant_bucket(item.participant_id), _task_segment_bucket(item.task_segment_id), item.stroke_id)))
     if not ordered:
         return ()
     session_ids = {mapping.session_id for mapping in ordered}
     if len(session_ids) != 1:
         raise ValueError("all mappings must belong to one session")
+    if task_segment_id is not None:
+        conflicts = sorted({mapping.task_segment_id for mapping in ordered if mapping.task_segment_id is not None and mapping.task_segment_id != task_segment_id})
+        if conflicts:
+            raise ValueError(f"task_segment_id context mismatch: caller={task_segment_id!r}, mappings={conflicts!r}")
     session_id = ordered[0].session_id
     stroke_index = {stroke.stroke_id: stroke for stroke in (strokes or ())}
     point_index = {point.point_id: point for point in (points or ())}
-    grouped: dict[str, list[StrokeMapping]] = {}
+    grouped: dict[tuple[str, str], list[StrokeMapping]] = {}
     for mapping in ordered:
-        grouped.setdefault(_participant_bucket(mapping.participant_id), []).append(mapping)
+        key = (_participant_bucket(mapping.participant_id), _task_segment_bucket(mapping.task_segment_id))
+        grouped.setdefault(key, []).append(mapping)
 
     pending: list[_PendingEvent] = []
-    for bucket in sorted(grouped):
+    for state_key in sorted(grouped):
         pending.extend(
             _detect_participant_events(
-                grouped[bucket],
-                bucket=bucket,
+                grouped[state_key],
+                state_key=state_key,
                 session_id=session_id,
                 stroke_index=stroke_index,
                 point_index=point_index,
@@ -104,7 +111,7 @@ def detect_student_process_events(
                 process_end_signal=process_end_signal,
                 session_end_ms=session_end_ms,
                 schema_version=schema_version,
-                task_segment_id=task_segment_id,
+                caller_task_segment_id=task_segment_id,
                 data_version=data_version,
                 source_provenance=source_provenance,
             )
@@ -120,7 +127,7 @@ def detect_student_process_events(
 def _detect_participant_events(
     mappings: list[StrokeMapping],
     *,
-    bucket: str,
+    state_key: tuple[str, str],
     session_id: str,
     stroke_index: dict[str, Stroke],
     point_index: dict[str, Point],
@@ -128,7 +135,7 @@ def _detect_participant_events(
     process_end_signal: bool,
     session_end_ms: int | None,
     schema_version: str,
-    task_segment_id: str | None,
+    caller_task_segment_id: str | None,
     data_version: str | None,
     source_provenance: Mapping[str, Any] | None,
 ) -> list[_PendingEvent]:
@@ -157,11 +164,11 @@ def _detect_participant_events(
             event_quality_flags.append("TIME_UNAVAILABLE")
         local_sequence = len(pending)
         event = StudentProcessEvent(
-            event_id=f"{session_id}:{bucket}:event:{local_sequence:04d}",
+            event_id=f"{session_id}:{state_key[0]}:{state_key[1]}:event:{local_sequence:04d}",
             schema_version=schema_version,
             event_type=event_type,
             session_id=session_id,
-            task_segment_id=task_segment_id,
+            task_segment_id=source.task_segment_id or mapping.task_segment_id or caller_task_segment_id,
             participant_id=source.participant_id,
             page_id=mapping.page_id,
             data_version=data_version,
@@ -182,7 +189,7 @@ def _detect_participant_events(
         )
         anchor = order_mapping or mapping
         semantic_order = {"PAGE_CHANGE": 0, "WRITING": 1, "QUESTION_LEAVE": 2, "QUESTION_VISIT": 3, "RETURN": 3, "REVISION_CANDIDATE": 4, "UNKNOWN": 5, "PROCESS_END": 6}.get(event_type, 9)
-        pending.append(_PendingEvent((anchor.start_time_ms is None, anchor.start_time_ms if anchor.start_time_ms is not None else 0, bucket, anchor.stroke_id, semantic_order, local_sequence), event))
+        pending.append(_PendingEvent((anchor.start_time_ms is None, anchor.start_time_ms if anchor.start_time_ms is not None else 0, state_key[0], state_key[1], anchor.stroke_id, semantic_order, local_sequence), event))
 
     for mapping in mappings:
         stroke = stroke_index.get(mapping.stroke_id)
@@ -208,7 +215,7 @@ def _detect_participant_events(
         question_id = mapping.question_id
         revisited = question_id in state.visited_questions and (state.active_question != question_id or page_changed)
         paused = _has_pause(state.active_mapping, mapping, config.revision_pause_threshold_ms) if state.active_question == question_id and not page_changed else False
-        history_key = _history_key(bucket, question_id, mapping.page_id, current_bbox)
+        history_key = _history_key(state_key, question_id, mapping.page_id, current_bbox)
         prior_bboxes = tuple(state.question_ink_history.get(history_key, ())) if history_key is not None else ()
         overlaps_prior = current_bbox is not None and any(_bbox_iou(current_bbox, previous) is not None and _bbox_iou(current_bbox, previous) >= config.revision_overlap_threshold for previous in prior_bboxes)
 
@@ -243,6 +250,10 @@ def _detect_participant_events(
 
 def _participant_bucket(participant_id: str | None) -> str:
     return participant_id if participant_id is not None else UNKNOWN_PARTICIPANT_BUCKET
+
+
+def _task_segment_bucket(task_segment_id: str | None) -> str:
+    return task_segment_id if task_segment_id is not None else UNKNOWN_TASK_SEGMENT_BUCKET
 
 
 def _has_writing_evidence(stroke: Stroke | None, points: dict[str, Point]) -> bool:
@@ -286,17 +297,21 @@ def _stroke_bbox(stroke: Stroke | None, points: dict[str, Point]) -> _StrokeBBox
         return None
     xs = [value[0] for value in coordinates]
     ys = [value[1] for value in coordinates]
-    return _StrokeBBox(min(xs), min(ys), max(xs), max(ys), space, stroke.page_id, stroke.participant_id)
+    raw_domain = stroke.provenance.get("raw_coordinate_domain", "unknown") if isinstance(stroke.provenance, dict) else "unknown"
+    coordinate_domain = "norm" if space == "norm" else str(raw_domain)
+    return _StrokeBBox(min(xs), min(ys), max(xs), max(ys), space, stroke.page_id, stroke.participant_id, coordinate_domain)
 
 
-def _history_key(participant_bucket: str, question_id: str, page_id: str | None, bbox: _StrokeBBox | None) -> tuple[str, str, str, str] | None:
+def _history_key(state_key: tuple[str, str], question_id: str, page_id: str | None, bbox: _StrokeBBox | None) -> tuple[str, str, str, str, str, str] | None:
     if bbox is None or page_id is None or bbox.coordinate_space == "unavailable":
         return None
-    return participant_bucket, question_id, page_id, bbox.coordinate_space
+    if bbox.coordinate_space == "raw" and bbox.coordinate_domain == "unknown":
+        return None
+    return state_key[0], state_key[1], question_id, page_id, bbox.coordinate_space, bbox.coordinate_domain
 
 
 def _bbox_iou(first: _StrokeBBox, second: _StrokeBBox) -> float | None:
-    if first.coordinate_space != second.coordinate_space or first.page_id != second.page_id or first.participant_id != second.participant_id:
+    if first.coordinate_space != second.coordinate_space or first.coordinate_domain != second.coordinate_domain or first.page_id != second.page_id or first.participant_id != second.participant_id:
         return None
     left, top = max(first.left, second.left), max(first.top, second.top)
     right, bottom = min(first.right, second.right), min(first.bottom, second.bottom)

@@ -74,7 +74,6 @@ def test_mapping_and_return_event_sequence_is_deterministic():
         "WRITING",
         "QUESTION_LEAVE",
         "RETURN",
-        "REVISION_CANDIDATE",
     ]
     assert events[7].question_id == "q1"
     assert events[7].source_stroke_ids == (strokes[2].stroke_id,)

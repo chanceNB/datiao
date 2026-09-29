@@ -29,6 +29,7 @@ class SyntheticManifest(BaseModel):
     session_id: str = Field(min_length=1)
     participant_id: str = Field(min_length=1)
     task_segment_id: str = Field(min_length=1)
+    device_id: str | None = Field(default=None, min_length=1)
     record_count: int = Field(ge=0)
     raw_records_hash: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
 
@@ -61,6 +62,7 @@ def build_synthetic_manifest(
     participant_id: str,
     task_segment_id: str,
     raw_records: Sequence[Mapping[str, Any]],
+    device_id: str | None = None,
 ) -> SyntheticManifest:
     """Build a Manifest from a frozen raw-record collection."""
 
@@ -73,6 +75,7 @@ def build_synthetic_manifest(
         session_id=session_id,
         participant_id=participant_id,
         task_segment_id=task_segment_id,
+        device_id=device_id,
         record_count=len(raw_records),
         raw_records_hash=f"sha256:{stable_json_hash(raw_records)}",
     )

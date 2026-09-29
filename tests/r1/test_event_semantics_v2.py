@@ -30,7 +30,7 @@ def event_types(raw, *, config=None, end=False, session_end_ms=None):
 def test_writing_and_question_visit_are_both_emitted():
     result, types = event_types(records([(5, 5, 0)]))
     assert types == ["WRITING", "QUESTION_VISIT"]
-    assert result.student_process_events[0].algorithm_version == "r1-event-rule-v0.2.1"
+    assert result.student_process_events[0].algorithm_version == "r1-event-rule-v0.2.2"
 
 
 def test_normal_same_question_multistroke_is_not_revision():

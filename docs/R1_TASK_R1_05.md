@@ -115,3 +115,14 @@ TASK-R1-06 — Synthetic Dataset / Manifest / Group Split（只建议，不执�
 ## Post-validation fix
 
 TASK-R1-05-FIX-01 PASS
+
+## Context boundary fix
+
+TASK-R1-05-FIX-02 PASS
+
+- Stroke context now includes `device_id`; provenance records `device_id` and `raw_coordinate_domain`.
+- Raw-coordinate revision history requires a known matching device domain; unknown or different domains do not produce overlap evidence.
+- Student Process state and revision history are isolated by participant and task segment.
+- Event `task_segment_id` follows the source mapping, with caller context used only as fallback and mismatch validation.
+- Explicit and timeout process end signals are emitted per participant/segment state.
+- Synthetic raw points and manifest carry `sim_pen_001`.

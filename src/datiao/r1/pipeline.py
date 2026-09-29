@@ -78,6 +78,10 @@ def run_r1_pipeline(
     points = parse_raw_points(adapted_records)
     if any(point.session_id != session_id for point in points):
         raise ValueError("all records must belong to the requested session_id")
+    if task_segment_id is not None:
+        conflicting_segments = sorted({point.task_segment_id for point in points if point.task_segment_id is not None and point.task_segment_id != task_segment_id})
+        if conflicting_segments:
+            raise ValueError(f"task_segment_id context mismatch: caller={task_segment_id!r}, points={conflicting_segments!r}")
 
     regions = tuple(question_regions)
     strokes = build_strokes(points, stroke_config)

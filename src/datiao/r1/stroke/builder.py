@@ -34,6 +34,7 @@ def _same_context(previous: Point, current: Point) -> bool:
         and previous.participant_id == current.participant_id
         and previous.task_segment_id == current.task_segment_id
         and previous.page_id == current.page_id
+        and previous.device_id == current.device_id
     )
 
 
@@ -121,6 +122,9 @@ def _make_stroke(stroke_index: int, points: tuple[Point, ...]) -> Stroke:
     known_timestamps = [timestamp for timestamp in timestamps if timestamp is not None]
     norm_path = path_length(points, "norm")
     bbox, bbox_coordinate_space = _bbox(points)
+    device_ids = {point.device_id for point in points}
+    device_id = next(iter(device_ids)) if len(device_ids) == 1 else None
+    raw_coordinate_domain = f"device:{device_id}" if device_id is not None else "unknown"
     return Stroke(
         stroke_id=f"stroke-{stroke_index:04d}",
         session_id=points[0].session_id,
@@ -134,9 +138,11 @@ def _make_stroke(stroke_index: int, points: tuple[Point, ...]) -> Stroke:
         end_time_ms=max(known_timestamps) if known_timestamps else None,
         bbox=bbox,
         quality_flags=stroke_quality_flags(points),
-        algorithm_version="r1-stroke-rule-v2",
+        algorithm_version="r1-stroke-rule-v2.2",
         provenance={
             "builder": "stroke_builder",
+            "device_id": device_id,
+            "raw_coordinate_domain": raw_coordinate_domain,
             "path_length_norm": norm_path,
             "bbox_coordinate_space": bbox_coordinate_space,
         },
