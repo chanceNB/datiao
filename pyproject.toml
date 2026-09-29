@@ -22,6 +22,11 @@ ml = [
     "numpy>=1.26",
     "scipy>=1.11",
 ]
+dl = [
+    "torch>=2.2,<3.0",
+    "numpy>=1.26",
+    "scikit-learn>=1.4,<2.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

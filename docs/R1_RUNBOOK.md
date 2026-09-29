@@ -126,3 +126,13 @@ Install the fixed baseline dependencies with:
 ```powershell
 python -m pip install -e ".[test,ml]"
 ```
+
+## R1-09 Pen TCN baseline
+
+Install the CPU deep-learning and LightGBM extras before running the baseline:
+
+```powershell
+python -m pip install -e ".[test,ml,dl]"
+```
+
+The fixed run is documented in [R1_TASK_R1_09.md](R1_TASK_R1_09.md). It reads the frozen Feature Builder output, fits normalization on train timesteps only, trains the strict causal Pen TCN, compares canonical eight-label metrics with the frozen LightGBM run after inference, reloads the checkpoint, and performs an independent Run2 reproducibility check. Do not use the test split for normalization, early stopping, architecture, threshold selection, or checkpoint selection.
