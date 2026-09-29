@@ -2,7 +2,7 @@
 
 from .audit import run_integrity_audit, run_leakage_audit
 from .io import load_materialized_dataset, reload_dataset
-from .manifest import compute_dataset_manifest_hash
+from .manifest import compute_case_record_hash, validate_case_record_hash, compute_case_collection_hash, compute_dataset_manifest_hash
 from .models import (
     DatasetBuildResult,
     DatasetConfig,
@@ -30,6 +30,9 @@ __all__ = [
     "run_leakage_audit",
     "run_integrity_audit",
     "compute_dataset_manifest_hash",
+    "compute_case_record_hash",
+    "validate_case_record_hash",
+    "compute_case_collection_hash",
 ]
 
 

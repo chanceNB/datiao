@@ -92,6 +92,7 @@ class SplitManifest(BaseModel):
     dataset_id: str = Field(min_length=1)
     dataset_version: str = Field(min_length=1)
     split_seed: int
+    group_field: Literal["participant_id", "group_id", "session_id"] = "group_id"
     participant_ids: tuple[str, ...]
     group_ids: tuple[str, ...]
     case_ids: tuple[str, ...]

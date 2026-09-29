@@ -73,7 +73,7 @@ def build_split_manifests(
         if not subset:
             raise ValueError(f"split {split_name} is empty")
         participants = tuple(sorted({case.participant_id for case in subset}))
-        groups = tuple(sorted({group_values[case.case_id] for case in subset}))
+        groups = tuple(sorted({case.group_id for case in subset}))
         manifests.append(
             SplitManifest(
                 split_version=split_version,
@@ -81,6 +81,7 @@ def build_split_manifests(
                 dataset_id=dataset_id,
                 dataset_version=dataset_version,
                 split_seed=split_seed,
+                group_field=group_field,
                 participant_ids=participants,
                 group_ids=groups,
                 case_ids=tuple(case.case_id for case in subset),

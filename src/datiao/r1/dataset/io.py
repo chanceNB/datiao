@@ -11,7 +11,9 @@ from ..mapper import StrokeMapping
 from ..models import Point, QuestionRegion, StudentProcessEvent, Stroke
 from ..synthetic.models import SyntheticTruthEvent
 from .models import CaseManifestRecord, DatasetConfig, DatasetManifest
-from .manifest import compute_dataset_manifest_hash
+from .models import SplitManifest
+from .manifest import compute_case_collection_hash, compute_config_hash, compute_dataset_manifest_hash, compute_split_manifest_hash, validate_case_record_hash
+from .audit import run_integrity_audit, run_leakage_audit, verify_file_hashes
 
 
 def json_dump(value: Any) -> str:
@@ -66,17 +68,28 @@ def reload_dataset(output: str | Path) -> ReloadedDataset:
     manifest = DatasetManifest.model_validate(manifest_data)
     if manifest.manifest_hash != compute_dataset_manifest_hash(manifest):
         raise ValueError("dataset manifest hash mismatch")
-    for relative_path, expected_hash in manifest.file_hashes.items():
-        candidate = root / relative_path
-        if not candidate.is_file():
-            raise ValueError(f"manifest file missing: {relative_path}")
-        import hashlib
-
-        digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        if expected_hash != f"sha256:{digest}":
-            raise ValueError(f"manifest file hash mismatch: {relative_path}")
+    hashes_ok, hash_errors = verify_file_hashes(root, manifest.file_hashes)
+    if not hashes_ok:
+        raise ValueError(f"manifest file hash verification failed: {hash_errors}")
+    if set(manifest.files) != set(manifest.file_hashes):
+        raise ValueError("manifest files and file_hashes coverage mismatch")
     config = DatasetConfig.model_validate(read_json(root / "config_snapshot.json"))
     cases = tuple(CaseManifestRecord.model_validate(item) for item in read_jsonl(root / "cases.jsonl"))
+    if manifest.dataset_config_hash != compute_config_hash(config.model_dump(mode="json")):
+        raise ValueError("dataset config hash mismatch")
+    if (manifest.dataset_id, manifest.dataset_version) != (config.dataset_id, config.dataset_version):
+        raise ValueError("dataset config identity mismatch")
+    case_payloads = tuple(case.model_dump(mode="json") for case in cases)
+    if any(not validate_case_record_hash(case) for case in case_payloads):
+        raise ValueError("per-case manifest hash mismatch")
+    if manifest.case_manifest_hash != compute_case_collection_hash(case_payloads):
+        raise ValueError("case collection hash mismatch")
+    split_manifests = tuple(
+        SplitManifest.model_validate(read_json(root / "splits" / f"{name}.json"))
+        for name in ("train", "validation", "test")
+    )
+    if manifest.split_manifest_hash != compute_split_manifest_hash(tuple(split.model_dump(mode="json") for split in split_manifests)):
+        raise ValueError("split manifest hash mismatch")
     raw_records = read_jsonl(root / "raw_records.jsonl")
     point_records = read_jsonl(root / "points.jsonl")
     stroke_records = read_jsonl(root / "strokes.jsonl")
@@ -90,11 +103,31 @@ def reload_dataset(output: str | Path) -> ReloadedDataset:
     regions = tuple(QuestionRegion.model_validate(item["region"]) for item in region_records)
     truth_events = tuple(SyntheticTruthEvent.model_validate(_tuple_fields(item["event"], ("source_point_ids",))) for item in truth_records)
     predicted_events = tuple(StudentProcessEvent.model_validate(item["event"]) for item in prediction_records)
+    leakage = run_leakage_audit(cases, split_manifests=split_manifests)
+    integrity = run_integrity_audit(
+        cases, point_records, stroke_records, mapping_records, truth_records, prediction_records,
+        manifest=manifest, dataset_root=root, split_manifests=split_manifests,
+        expected_split_seed=config.split_seed,
+    )
+    if leakage.status != "PASS":
+        raise ValueError(f"recomputed leakage audit failed: {leakage.model_dump(mode='json')}")
+    if integrity.status != "PASS":
+        raise ValueError(f"recomputed integrity audit failed: {integrity.model_dump(mode='json')}")
+    stored_leakage = read_json(root / "audits" / "leakage_audit.json")
+    stored_integrity = read_json(root / "audits" / "integrity_audit.json")
+    if stored_leakage != leakage.model_dump(mode="json"):
+        raise ValueError("stored leakage audit differs from recomputed audit")
+    if stored_integrity != integrity.model_dump(mode="json"):
+        raise ValueError("stored integrity audit differs from recomputed audit")
+    summary = read_json(root / "dataset_summary.json")
+    if summary.get("manifest_hash") != manifest.manifest_hash:
+        raise ValueError("summary manifest hash mismatch")
     return ReloadedDataset(
         output_path=str(root),
         manifest=manifest,
         config=config,
         cases=cases,
+        split_manifests=split_manifests,
         raw_records=raw_records,
         point_records=point_records,
         stroke_records=stroke_records,
@@ -107,9 +140,9 @@ def reload_dataset(output: str | Path) -> ReloadedDataset:
         regions=regions,
         truth_events=truth_events,
         predicted_events=predicted_events,
-        summary=read_json(root / "dataset_summary.json"),
-        leakage_audit=read_json(root / "audits" / "leakage_audit.json"),
-        integrity_audit=read_json(root / "audits" / "integrity_audit.json"),
+        summary=summary,
+        leakage_audit=leakage.model_dump(mode="json"),
+        integrity_audit=integrity.model_dump(mode="json"),
     )
 
 

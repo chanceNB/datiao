@@ -44,13 +44,13 @@ The generated directory uses deterministic UTF-8 JSON/JSONL. Truth and R1 rule p
 
 The output contains `dataset_manifest.json`, `dataset_summary.json`, `config_snapshot.json`, aggregated JSONL files for raw records, Points, Strokes, mappings, regions, truth and predictions, three split files, and `audits/leakage_audit.json` plus `audits/integrity_audit.json`.
 
-- dataset manifest hash: `sha256:53b9213d92311955edd02a9df415b338798c2fd63155fb191148ccc438d29d20`
+- dataset manifest hash: `sha256:c493f792f9add5547427d002eb74fa0cc0bb663f7f0bb9b19c2bd8c97674af82`
 - config hash: `sha256:ee0bb06a5d21c0472d52fe0a707784a670e6a4895eefaca52390b9f159a3c385`
-- case manifest hash: `sha256:eaa04779a7eab6a8ae549ec26ff776d75f13b76b9cfdeb6b210f1a273ff41afa`
-- split manifest hash: `sha256:503f98a71305893ace59cc3d9aad01f1f003a0d8b39b30c84172497cabf69342`
+- case manifest hash: `sha256:06365a88845b3032b9a036f97d572934713b86243b790df5cbd8f322d9df56a6`
+- split manifest hash: `sha256:434580886db58540ad7b16e5dc777ad99063a7d16a7886237af258e9b1a85499`
 - core file SHA-256 values are recorded in `dataset_manifest.json`.
 
-The manifest hash excludes its own `manifest_hash` field. Paths stored in the manifest are relative only.
+The manifest hash excludes its own `manifest_hash` field. Per-case hashes and the aggregate case collection hash exclude split assignment and the hash field itself. Paths stored in the manifest are relative only. Summary and audit JSON files are derived verification artifacts and are excluded from the content file hash list.
 
 ## 6. GROUP SPLIT
 
@@ -99,7 +99,7 @@ Truth and prediction distributions remain separate in `dataset_summary.json`; no
 
 ## 10. RELOAD AND DETERMINISM
 
-`reload_dataset()` validates the Dataset Manifest hash, every recorded core file hash, Point/Stroke/QuestionRegion/Mapping/Event models, and returns validated collections. Same-config builds produce identical file hashes and manifest hashes. Changing only `split_seed` leaves generated content hashes unchanged while changing the split manifest; changing `dataset_seed` changes raw-record and case content hashes.
+`reload_dataset()` validates the Dataset Manifest hash, every recorded core file hash, split manifests against `cases.jsonl`, per-case and aggregate case hashes, Point/Stroke/QuestionRegion/Mapping/Event models, then recomputes Leakage and Integrity audits and compares them with the stored reports. Same-config builds produce identical file hashes and manifest hashes. Changing only `split_seed` leaves generated content and case hashes unchanged while changing `cases.jsonl`, split files and the split/overall manifest hashes; changing `dataset_seed` changes raw-record and case content hashes.
 
 ## 11. R4 HANDOFF
 
@@ -123,6 +123,10 @@ TASK-R1-07 — Episode / Feature Builder
 
 ## 14. TEST RESULTS
 
-- tests/r1: 87 passed
+- tests/r1: 100 passed
 - tests/contracts: 31 passed
-- full: 118 passed
+- full: 131 passed
+
+## 15. TASK-R1-06-FIX-01
+
+PASS. The follow-up fixed case hash semantics, actual file SHA-256 verification, split manifest cross-checks, reload recomputation and tamper detection. See `docs/R1_TASK_R1_06_FIX_01.md` for the detailed report.

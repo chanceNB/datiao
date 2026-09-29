@@ -7,7 +7,7 @@
 - dataset_type: `synthetic`
 - output: `artifacts/r1_synthetic_penprocess_v1/`
 - config: `configs/r1_synthetic_dataset_v1.json`
-- dataset manifest hash: `sha256:53b9213d92311955edd02a9df415b338798c2fd63155fb191148ccc438d29d20`
+- dataset manifest hash: `sha256:c493f792f9add5547427d002eb74fa0cc0bb663f7f0bb9b19c2bd8c97674af82`
 
 ## Versions
 
@@ -21,6 +21,8 @@
 ## Candidate split and audits
 
 R1 generated a deterministic participant-level candidate split: 14 train participants, 3 validation participants and 3 test participants. Leakage and integrity audits both report `PASS`; their JSON reports are under `audits/` in the materialized directory.
+
+Per-case and aggregate case hashes exclude split assignment. Split manifests are independently hashed and checked against `cases.jsonl`; summary and audit JSON files are derived verification artifacts rather than content-addressed assets.
 
 ## Truth and prediction
 

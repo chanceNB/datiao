@@ -11,11 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from ..models import is_canonical_v1_eligible
-from ..models.immutable import stable_json_hash
 from ..synthetic import SyntheticCaseSpec, generate_synthetic_case_from_spec
 from .audit import run_integrity_audit, run_leakage_audit
 from .io import write_json, write_jsonl
-from .manifest import compute_case_manifest_hash, compute_config_hash, compute_dataset_manifest_hash, compute_split_manifest_hash
+from .manifest import compute_case_record_hash, compute_case_manifest_hash, compute_config_hash, compute_dataset_manifest_hash, compute_split_manifest_hash
 from .models import CaseManifestRecord, DatasetBuildResult, DatasetConfig, DatasetManifest, DatasetSummary, SplitManifest
 from .split import build_split_manifests
 
@@ -95,6 +94,7 @@ def _case_record(config: DatasetConfig, spec: SyntheticCaseSpec, case: Any, spli
         "case_id": spec.case_id,
         "dataset_id": config.dataset_id,
         "dataset_version": config.dataset_version,
+        "dataset_type": "synthetic",
         "participant_id": spec.participant_id,
         "session_id": spec.session_id,
         "task_segment_id": spec.task_segment_id,
@@ -109,7 +109,7 @@ def _case_record(config: DatasetConfig, spec: SyntheticCaseSpec, case: Any, spli
         "quality_status": _quality_status(case),
         "split": split,
     }
-    base["case_manifest_hash"] = f"sha256:{stable_json_hash(base)}"
+    base["case_manifest_hash"] = compute_case_record_hash(base)
     return CaseManifestRecord.model_validate(base)
 
 
@@ -242,7 +242,7 @@ def materialize_dataset(config: DatasetConfig, output: str | Path, *, overwrite:
         "splits/test.json",
     ]
     file_hashes = {relative: _sha256(root / relative) for relative in core_files}
-    leakage = run_leakage_audit(records)
+    leakage = run_leakage_audit(records, split_manifests=split_manifests)
     if leakage.status != "PASS":
         raise ValueError(f"leakage audit failed: {leakage.model_dump(mode='json')}")
     write_json(root / "audits" / "leakage_audit.json", leakage.model_dump(mode="json"))
@@ -253,7 +253,12 @@ def materialize_dataset(config: DatasetConfig, output: str | Path, *, overwrite:
         outputs["mappings"],
         outputs["truth_events"],
         outputs["predicted_events"],
-        file_hashes_valid=True,
+        dataset_root=root,
+        expected_file_hashes=file_hashes,
+        split_manifests=split_manifests,
+        expected_dataset_id=config.dataset_id,
+        expected_dataset_version=config.dataset_version,
+        expected_split_seed=config.split_seed,
     )
     if integrity.status != "PASS":
         raise ValueError(f"integrity audit failed: {integrity.model_dump(mode='json')}")

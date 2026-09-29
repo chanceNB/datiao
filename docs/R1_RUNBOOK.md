@@ -11,7 +11,7 @@ python -m pytest
 
 `.[test]` 会安装项目和全部 Contract/R1 测试依赖，包括 `pytest` 与 `jsonschema`。运行手册不依赖某个开发者的本机 Python 路径。
 
-当前仓库全量测试以实际 pytest 输出为准；TASK-R1-06 完成时为 118 个（R1 87，Contract 31）。真实设备字段尚未冻结时，只能传入以下规范化字段：
+当前仓库全量测试以实际 pytest 输出为准；TASK-R1-06-FIX-01 完成时为 131 个（R1 100，Contract 31）。真实设备字段尚未冻结时，只能传入以下规范化字段：
 
 ```text
 point_id, session_id, page_id, timestamp_ms, x, y, sequence
