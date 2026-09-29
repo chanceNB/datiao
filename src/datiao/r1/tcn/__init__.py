@@ -1,7 +1,7 @@
 """Fixed causal Pen TCN baseline."""
 
 def run_baseline(*args, **kwargs):
-    from .train import run_baseline as implementation
+    from .io import run_baseline as implementation
     return implementation(*args, **kwargs)
 
 def reload_tcn_run(*args, **kwargs):

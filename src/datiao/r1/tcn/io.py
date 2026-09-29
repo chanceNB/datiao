@@ -63,8 +63,11 @@ def compare_with_lightgbm(tcn_result, lightgbm_run):
 
 
 def _write_manifest(result, comparison):
-    root=Path(result['output_path']); model_file_hash=sha256_file(root/'model'/'best_model.pt'); predictions_hash=sha256_file(root/'predictions.jsonl'); metrics_hash=sha256_file(root/'metrics.json'); diagnostics_hash=sha256_file(root/'causal_diagnostics.json'); comparison_hash=semantic_json_hash(comparison)
-    payload={'run_version':'1.0.0','baseline_id':'r1-pen-tcn-v1','baseline_version':'1.0.0','source_feature_manifest_hash':result['data'].manifest.manifest_hash,'source_dataset_manifest_hash':result['data'].manifest.source_dataset_manifest_hash,'source_split_manifest_hash':result['data'].manifest.source_split_manifest_hash,'feature_order':list(result['data'].manifest.feature_order),'label_order':list(LABEL_ORDER),'sequence_count':len(result['data'].sequences),'real_timestep_count':len(result['predictions']),'split_counts':{s:sum(r['split']==s for r in result['predictions']) for s in ('train','validation','test')},'normalization_hash':result['normalizer'].semantic_hash,'architecture':{'input_channels':24,'hidden_channels':[32,32],'kernel_size':2,'dilations':[1,2],'convs_per_block':2,'dropout':.1,'receptive_field':result['model'].receptive_field,'parameter_count':result['model'].parameter_count},'seed':20260929,'device':'cpu','threshold':.5,'best_epoch':result['training'].best_epoch,'best_validation_loss':result['training'].best_validation_loss,'model_file_hash':model_file_hash,'model_state_hash':result['model_state_hash'],'predictions_hash':predictions_hash,'metrics_hash':metrics_hash,'causal_diagnostics_hash':diagnostics_hash,'comparison_hash':comparison_hash,'comparison':comparison}
+    root=Path(result['output_path']); comparison_hash=semantic_json_hash(comparison)
+    artifact_files=('model/best_model.pt','normalization.json','sequence_length_audit.json','target_causality_audit.json','training_history.json','metrics.json','causal_diagnostics.json','predictions.jsonl','config_snapshot.json','environment.json','comparison_lightgbm.json','audits/input_integrity.json','audits/normalizer.json','audits/causality.json','audits/padding.json')
+    artifact_hashes={relative:sha256_file(root/relative) for relative in artifact_files}
+    model_file_hash=artifact_hashes['model/best_model.pt']; predictions_hash=artifact_hashes['predictions.jsonl']; metrics_hash=artifact_hashes['metrics.json']; diagnostics_hash=artifact_hashes['causal_diagnostics.json']
+    payload={'run_version':'1.0.0','baseline_id':'r1-pen-tcn-v1','baseline_version':'1.0.0','source_feature_manifest_hash':result['data'].manifest.manifest_hash,'source_dataset_manifest_hash':result['data'].manifest.source_dataset_manifest_hash,'source_split_manifest_hash':result['data'].manifest.source_split_manifest_hash,'feature_order':list(result['data'].manifest.feature_order),'label_order':list(LABEL_ORDER),'sequence_count':len(result['data'].sequences),'real_timestep_count':len(result['predictions']),'split_counts':{s:sum(r['split']==s for r in result['predictions']) for s in ('train','validation','test')},'normalization_hash':result['normalizer'].semantic_hash,'config_snapshot_hash':artifact_hashes['config_snapshot.json'],'artifact_hashes':artifact_hashes,'architecture':{'input_channels':24,'hidden_channels':[32,32],'kernel_size':2,'dilations':[1,2],'convs_per_block':2,'dropout':.1,'output_channels':8,'receptive_field':result['model'].receptive_field,'parameter_count':result['model'].parameter_count},'seed':20260929,'device':'cpu','threshold':.5,'best_epoch':result['training'].best_epoch,'best_validation_loss':result['training'].best_validation_loss,'model_file_hash':model_file_hash,'model_state_hash':result['model_state_hash'],'predictions_hash':predictions_hash,'metrics_hash':metrics_hash,'causal_diagnostics_hash':diagnostics_hash,'comparison_hash':comparison_hash,'comparison':comparison}
     payload['run_hash']=semantic_run_hash(payload); write_json(root/'run_manifest.json',payload); return payload
 
 
@@ -72,6 +75,8 @@ def reload_tcn_run(output, features):
     root=Path(output); manifest=json.loads((root/'run_manifest.json').read_text(encoding='utf-8')); data=load_tcn_dataset(features)
     if manifest['source_feature_manifest_hash'] != data.manifest.manifest_hash: raise ValueError('source feature lineage mismatch')
     if sha256_file(root/'model'/'best_model.pt') != manifest['model_file_hash']: raise ValueError('model file hash mismatch')
+    for relative, digest in manifest.get('artifact_hashes', {}).items():
+        if sha256_file(root/relative) != digest: raise ValueError(f'artifact hash mismatch: {relative}')
     if sha256_file(root/'predictions.jsonl') != manifest['predictions_hash']: raise ValueError('predictions hash mismatch')
     if sha256_file(root/'metrics.json') != manifest['metrics_hash']: raise ValueError('metrics hash mismatch')
     if sha256_file(root/'causal_diagnostics.json') != manifest['causal_diagnostics_hash']: raise ValueError('diagnostics hash mismatch')
@@ -82,7 +87,13 @@ def reload_tcn_run(output, features):
     comparison_path=root/'comparison_lightgbm.json'
     if not comparison_path.exists() or semantic_json_hash(json.loads(comparison_path.read_text(encoding='utf-8'))) != manifest['comparison_hash']:
         raise ValueError('comparison hash mismatch')
-    checkpoint=torch.load(root/'model'/'best_model.pt',map_location='cpu',weights_only=False); model=PenTCN(); model.load_state_dict(checkpoint['state_dict']); model.eval(); state_hash=model_state_hash(model)
+    checkpoint=torch.load(root/'model'/'best_model.pt',map_location='cpu',weights_only=False)
+    expected_architecture=manifest['architecture']
+    if checkpoint.get('architecture', {}) != {key: expected_architecture[key] for key in ('input_channels','hidden_channels','kernel_size','dilations','convs_per_block','dropout','output_channels')}:
+        raise ValueError('checkpoint architecture mismatch')
+    if checkpoint.get('receptive_field') != expected_architecture['receptive_field'] or checkpoint.get('parameter_count') != expected_architecture['parameter_count']:
+        raise ValueError('checkpoint metadata mismatch')
+    model=PenTCN(); model.load_state_dict(checkpoint['state_dict']); model.eval(); state_hash=model_state_hash(model)
     if state_hash != manifest['model_state_hash']: raise ValueError('model state hash mismatch')
     rows=_read_predictions(root/'predictions.jsonl'); val=evaluate(model,make_loader(data.by_split['validation'],32),normalizer,.5); test=evaluate(model,make_loader(data.by_split['test'],32),normalizer,.5)
     fresh=val.predictions+test.predictions; saved={r['episode_id']:r for r in rows if r['split'] in ('validation','test')}
@@ -100,6 +111,6 @@ def run_baseline(features, output, config, lightgbm_run, overwrite=False):
     data=load_tcn_dataset(features); run1=execute_training_once(data,root,config); comparison=compare_with_lightgbm(run1,lightgbm_run); write_json(root/'comparison_lightgbm.json',comparison); manifest=_write_manifest(run1,comparison)
     reload=reload_tcn_run(root,features); write_json(root/'audits'/'model_reload.json',reload)
     with tempfile.TemporaryDirectory(prefix='r1-tcn-run2-') as temp:
-        run2=execute_training_once(data,temp,config); comparison2=compare_with_lightgbm(run2,lightgbm_run); manifest2=_write_manifest(run2,comparison2)
+        run2=execute_training_once(data,temp,config); comparison2=compare_with_lightgbm(run2,lightgbm_run); write_json(Path(temp)/'comparison_lightgbm.json',comparison2); manifest2=_write_manifest(run2,comparison2)
     repro={'run1_prediction_hash':manifest['predictions_hash'],'run2_prediction_hash':manifest2['predictions_hash'],'run1_metrics_hash':manifest['metrics_hash'],'run2_metrics_hash':manifest2['metrics_hash'],'run1_causal_diagnostics_hash':manifest['causal_diagnostics_hash'],'run2_causal_diagnostics_hash':manifest2['causal_diagnostics_hash'],'run1_model_state_hash':manifest['model_state_hash'],'run2_model_state_hash':manifest2['model_state_hash'],'run1_comparison_hash':manifest['comparison_hash'],'run2_comparison_hash':manifest2['comparison_hash'],'run1_run_hash':manifest['run_hash'],'run2_run_hash':manifest2['run_hash'],'run1_model_file_hash':manifest['model_file_hash'],'run2_model_file_hash':manifest2['model_file_hash'],'semantic_reproducibility':all(manifest[k]==manifest2[k] for k in ('predictions_hash','metrics_hash','causal_diagnostics_hash','model_state_hash','comparison_hash','run_hash')),'artifact_byte_reproducibility':manifest['model_file_hash']==manifest2['model_file_hash']}
     repro['status']='PASS' if repro['semantic_reproducibility'] else 'FAIL'; write_json(root/'audits'/'reproducibility.json',repro); return {'manifest':manifest,'comparison':comparison,'reload':reload,'reproducibility':repro}

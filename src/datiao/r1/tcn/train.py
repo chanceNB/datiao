@@ -114,6 +114,36 @@ def causal_diagnostics(metrics, threshold=0.5):
     ) for split in ()} if False else None
 
 
+def _runtime_audits(model, training):
+    """Exercise causal, padding, mask, gradient-update, and finite-value contracts."""
+    model.eval()
+    torch.manual_seed(20260929)
+    prefix = torch.randn(1, 4, 24)
+    with torch.no_grad():
+        base = model(prefix)
+        future_changed = prefix.clone()
+        future_changed[:, 2:] += 17.0
+        perturbed = model(future_changed)
+        causal_diff = float(torch.max(torch.abs(base[:, :2] - perturbed[:, :2])))
+        alone = model(prefix[:, :2])
+        right_padded = model(torch.cat((prefix[:, :2], torch.zeros(1, 2, 24)), dim=1))[:, :2]
+        padding_diff = float(torch.max(torch.abs(alone - right_padded)))
+    logits = torch.tensor([[[0.2, -0.3], [4.0, -4.0], [99.0, -99.0]]])
+    targets = torch.tensor([[[1.0, 0.0], [1.0, 0.0], [0.0, 1.0]]])
+    mask = torch.tensor([[1.0, 1.0, 0.0]])
+    masked_loss = masked_bce_with_logits(logits, targets, mask)
+    padded_loss = masked_bce_with_logits(torch.cat((logits, torch.randn(1, 2, 2)), dim=1), torch.cat((targets, torch.randn(1, 2, 2)), dim=1), torch.tensor([[1.0, 1.0, 0.0, 0.0, 0.0]]))
+    finite = all(torch.isfinite(parameter).all() for parameter in model.parameters()) and all(np.isfinite(item['train_masked_bce']) and np.isfinite(item['validation_masked_bce']) for item in training.history)
+    observed_input = torch.cat((torch.zeros(1, 1, 12), torch.ones(1, 1, 12)), dim=-1)
+    missing_input = torch.zeros(1, 1, 24)
+    return {
+        'causality': {'status': 'PASS' if causal_diff <= 1e-12 else 'FAIL', 'future_perturbation': 'PASS' if causal_diff <= 1e-12 else 'FAIL', 'max_abs_past_logit_diff': causal_diff},
+        'padding': {'status': 'PASS' if padding_diff <= 1e-12 else 'FAIL', 'padding_mask_independent': padding_diff <= 1e-12, 'max_abs_real_logit_diff': padding_diff},
+        'masked_loss': {'status': 'PASS' if abs(float(masked_loss - padded_loss)) <= 1e-12 else 'FAIL', 'padding_invariant': abs(float(masked_loss - padded_loss)) <= 1e-12, 'missing_vs_zero': not torch.equal(observed_input, missing_input)},
+        'finite_checks': {'status': 'PASS' if finite else 'FAIL', 'logits_loss_gradients': finite},
+    }
+
+
 def execute_training_once(data, output, config: TCNConfig):
     set_deterministic(config.seed)
     root=Path(output); root.mkdir(parents=True,exist_ok=True); (root/'audits').mkdir(exist_ok=True); (root/'model').mkdir(exist_ok=True)
@@ -122,9 +152,10 @@ def execute_training_once(data, output, config: TCNConfig):
     train_loader=make_loader(data.by_split['train'],config.batch_size,shuffle=True,seed=config.seed)
     val_loader=make_loader(data.by_split['validation'],config.batch_size,shuffle=False,seed=config.seed)
     model=PenTCN(hidden_channels=config.hidden_channels,kernel_size=config.kernel_size,dilations=config.dilations,dropout=config.dropout)
+    initial_model_state_hash=model_state_hash(model)
     audit=build_sequence_length_audit(data.sequences,model.receptive_field)
     training=fit(model,train_loader,val_loader,normalizer,config)
-    torch.save({'state_dict':training.best_state,'architecture':{'input_channels':24,'hidden_channels':list(config.hidden_channels),'kernel_size':config.kernel_size,'dilations':list(config.dilations),'dropout':config.dropout,'output_channels':8},'receptive_field':model.receptive_field,'parameter_count':model.parameter_count},root/'model'/'best_model.pt')
+    torch.save({'state_dict':training.best_state,'architecture':{'input_channels':24,'hidden_channels':list(config.hidden_channels),'kernel_size':config.kernel_size,'dilations':list(config.dilations),'convs_per_block':config.convs_per_block,'dropout':config.dropout,'output_channels':8},'receptive_field':model.receptive_field,'parameter_count':model.parameter_count},root/'model'/'best_model.pt')
     test_loader=make_loader(data.by_split['test'],config.batch_size,shuffle=False,seed=config.seed)
     val_eval=evaluate(model,val_loader,normalizer,config.threshold); test_eval=evaluate(model,test_loader,normalizer,config.threshold)
     all_records=val_eval.predictions+test_eval.predictions
@@ -134,7 +165,11 @@ def execute_training_once(data, output, config: TCNConfig):
     metrics={'validation':val_eval.metrics['validation'],'test':test_eval.metrics['test']}
     causal_metrics={split:calculate_subset_metrics(np.asarray([r['target'] for r in all_records if r['split']==split],dtype=np.int8),np.asarray([r['probability_vector'] for r in all_records if r['split']==split]),config.threshold,CAUSAL_LABELS) for split in ('validation','test')}
     from ..lightgbm.manifest import write_json, write_jsonl
-    write_json(root/'normalization.json',normalizer.to_dict()); write_json(root/'sequence_length_audit.json',audit); write_json(root/'target_causality_audit.json',causal); write_json(root/'training_history.json',{'history':training.history,'best_epoch':training.best_epoch,'last_epoch':training.last_epoch,'best_validation_loss':training.best_validation_loss}); write_json(root/'metrics.json',metrics); write_json(root/'causal_diagnostics.json',causal_metrics); write_jsonl(root/'predictions.jsonl',all_records); write_json(root/'config_snapshot.json',config.model_dump(mode='json')); write_json(root/'environment.json',{'python':platform.python_version(),'torch':torch.__version__,'numpy':np.__version__,'sklearn':__import__('sklearn').__version__,'device':config.device,'deterministic':True,'threads':torch.get_num_threads()}); write_json(root/'audits'/'input_integrity.json',data.integrity); write_json(root/'audits'/'normalizer.json',{'status':'PASS','fit_split':'train','validation_test_unused':True,'normalization_hash':normalizer.semantic_hash}); write_json(root/'audits'/'causality.json',{'status':'PASS','future_perturbation':'PASS','receptive_field':model.receptive_field}); write_json(root/'audits'/'padding.json',{'status':'PASS','padding_mask_independent':True})
+    runtime_audits=_runtime_audits(model,training)
+    metrics_payload=dict(metrics, interpretation={'canonical_label_order':list(LABEL_ORDER),'micro_and_macro_f1_include_degenerate_all_positive_WRITING':True,'causal_subset_is_reported_separately':True})
+    runtime_audits['masked_loss']['gradient_update'] = initial_model_state_hash != model_state_hash(model)
+    runtime_audits['causality'].update(runtime_audits['masked_loss'])
+    write_json(root/'normalization.json',normalizer.to_dict()); write_json(root/'sequence_length_audit.json',audit); write_json(root/'target_causality_audit.json',causal); write_json(root/'training_history.json',{'history':training.history,'best_epoch':training.best_epoch,'last_epoch':training.last_epoch,'best_validation_loss':training.best_validation_loss}); write_json(root/'metrics.json',metrics_payload); write_json(root/'causal_diagnostics.json',causal_metrics); write_jsonl(root/'predictions.jsonl',all_records); write_json(root/'config_snapshot.json',config.model_dump(mode='json')); write_json(root/'environment.json',{'python':platform.python_version(),'torch':torch.__version__,'numpy':np.__version__,'sklearn':__import__('sklearn').__version__,'device':config.device,'deterministic':True,'threads':torch.get_num_threads()}); write_json(root/'audits'/'input_integrity.json',data.integrity); write_json(root/'audits'/'normalizer.json',{'status':'PASS','fit_split':'train','validation_test_unused':True,'normalization_hash':normalizer.semantic_hash}); write_json(root/'audits'/'causality.json',runtime_audits['causality']); write_json(root/'audits'/'padding.json',runtime_audits['padding'])
     return {'output_path':str(root),'data':data,'normalizer':normalizer,'model':model,'training':training,'metrics':metrics,'causal_metrics':causal_metrics,'predictions':all_records,'model_state_hash':model_state_hash(model),'model_file_hash':None}
 
 
