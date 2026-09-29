@@ -20,7 +20,7 @@ class QuestionRegion(BaseModel):
     region_type: Literal["rectangle", "polygon"]
     polygon_norm: tuple[tuple[float, float], ...]
     priority: int = 0
-    coordinate_space: Literal["norm", "legacy"] = "norm"
+    coordinate_space: Literal["norm"] = "norm"
 
     @model_validator(mode="before")
     @classmethod

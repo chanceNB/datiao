@@ -49,7 +49,10 @@ def test_generated_regions_validate_as_v1_and_trace_checks_stroke_point_consiste
 def test_event_ref_legality_is_explicit():
     with pytest.raises(ValidationError):
         StudentProcessEvent(event_id="e", event_type="WRITING", session_id="s", start_time_ms=0, end_time_ms=0)
-    assert StudentProcessEvent(event_id="e", event_type="UNKNOWN", session_id="s", start_time_ms=None, end_time_ms=None).point_refs == ()
+    assert StudentProcessEvent(
+        event_id="e", event_type="UNKNOWN", session_id="s", start_time_ms=None, end_time_ms=None,
+        quality_status="DEGRADED", quality_flags=("TIME_UNAVAILABLE",),
+    ).point_refs == ()
 
 
 def test_partial_norm_is_preserved_as_unknown_with_quality_flag():

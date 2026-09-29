@@ -21,6 +21,8 @@ EventType = Literal[
     "UNKNOWN",
 ]
 QualityStatus = Literal["VALID", "DEGRADED", "INVALID"]
+QUESTION_EVENT_TYPES = frozenset({"QUESTION_VISIT", "QUESTION_LEAVE", "RETURN", "REVISION_CANDIDATE"})
+TIME_QUALITY_FLAGS = frozenset({"MISSING_TIMESTAMP", "TIME_UNAVAILABLE", "NO_TIME_REFERENCE"})
 
 
 class StudentProcessEvent(BaseModel):
@@ -32,10 +34,10 @@ class StudentProcessEvent(BaseModel):
     session_id: str = Field(min_length=1)
     task_segment_id: str | None = None
     participant_id: str | None = None
-    question_id: str | None = None
+    question_id: str | None = Field(default=None, min_length=1)
     page_id: str | None = None
-    previous_question_id: str | None = None
-    next_question_id: str | None = None
+    previous_question_id: str | None = Field(default=None, min_length=1)
+    next_question_id: str | None = Field(default=None, min_length=1)
     sequence: int = Field(default=0, ge=0)
     start_time_ms: int | None
     end_time_ms: int | None
@@ -60,10 +62,24 @@ class StudentProcessEvent(BaseModel):
                 values[key] = tuple(values[key])
         return values
 
+    @field_validator("point_refs", "stroke_refs")
+    @classmethod
+    def validate_reference_ids(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if any(not reference for reference in value):
+            raise ValueError("reference IDs must not be empty")
+        return value
+
     @model_validator(mode="after")
     def validate_contract(self) -> "StudentProcessEvent":
         if self.start_time_ms is not None and self.end_time_ms is not None and self.end_time_ms < self.start_time_ms:
             raise ValueError("end_time_ms must be greater than or equal to start_time_ms")
+        if self.quality_status == "VALID" and (self.start_time_ms is None or self.end_time_ms is None):
+            raise ValueError("VALID events require start_time_ms and end_time_ms")
+        if self.quality_status != "VALID" and (self.start_time_ms is None or self.end_time_ms is None):
+            if not TIME_QUALITY_FLAGS.intersection(self.quality_flags):
+                raise ValueError("missing event time requires an explanatory quality flag")
+        if self.event_type in QUESTION_EVENT_TYPES and self.question_id is None:
+            raise ValueError(f"{self.event_type} events require question_id")
         if self.event_type in {"WRITING", "QUESTION_VISIT", "QUESTION_LEAVE", "RETURN", "REVISION_CANDIDATE"} and not (self.point_refs or self.stroke_refs):
             raise ValueError("this event type requires point_refs or stroke_refs")
         if isinstance(self.provenance, dict) and self.provenance.get("dataset_type") == "synthetic":

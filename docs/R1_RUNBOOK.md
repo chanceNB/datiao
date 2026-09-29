@@ -2,14 +2,16 @@
 
 ## 安装和测试
 
-在仓库根目录执行：
+在仓库根目录执行标准安装和测试：
 
 ```powershell
-$env:PYTHONPATH = "src"
+python -m pip install -e ".[test]"
 python -m pytest
 ```
 
-当前仓库全量测试以实际 pytest 输出为准；本任务完成时为 58 个。真实设备字段尚未冻结时，只能传入以下规范化字段：
+`.[test]` 会安装项目和全部 Contract/R1 测试依赖，包括 `pytest` 与 `jsonschema`。运行手册不依赖某个开发者的本机 Python 路径。
+
+当前仓库全量测试以实际 pytest 输出为准；本任务完成时为 68 个。真实设备字段尚未冻结时，只能传入以下规范化字段：
 
 ```text
 point_id, session_id, page_id, timestamp_ms, x, y, sequence
@@ -66,17 +68,16 @@ python -c "from datiao.r1.synthetic import Scenario, generate_synthetic_case; c=
 
 ## Contract V1（TASK-R1-04）
 
-标准输出版本为 `1.0.0`，schema 位于 `contracts/`。下游读取 `Point` 的 raw/mm/norm 坐标、`Stroke.point_refs`、`QuestionRegion.polygon_norm` 和 Event 的 `start_time_ms/end_time_ms`、`point_refs/stroke_refs`。旧 `occurred_at_ms` 与 `source_*_ids` 只用于迁移兼容，不会出现在标准 `model_dump()`。
+标准输出版本为 `1.0.0`，schema 位于 `contracts/`。下游读取 Point 的 raw/mm/norm 坐标、Stroke 的 `point_refs`、标准 QuestionRegion 的 `polygon_norm` 和 Event 的 `start_time_ms/end_time_ms`、`point_refs/stroke_refs`。内部 degraded Point 会保留原始数据，但只有通过 Canonical Point V1 Gate 才能作为成功标准输出。旧 `occurred_at_ms` 与 `source_*_ids` 只用于迁移兼容，不会出现在标准 `model_dump()`。
 
-Synthetic 使用 `sim_session_...`、`sim_p_...`、`sim_segment_...`，每个 Session 从 0ms 开始；Synthetic provenance 必须带六个字段和实际 SHA-256 manifest hash。`quality_status` 是总状态，`quality_flags` 是原因；UNKNOWN 事件不表示数据 INVALID。
+Synthetic 使用 `sim_session_...`、`sim_p_...`、`sim_segment_...`，每个 Session 从 0ms 开始；Synthetic provenance 必须带六个字段和来自 Synthetic Manifest 的实际 SHA-256 manifest hash，Manifest 同时保留 raw records hash。`quality_status` 是总状态，`quality_flags` 是原因；UNKNOWN 事件不表示数据 INVALID。8 类 Event Contract 已冻结；部分事件检测语义将在 R1-05 完成。
 
 Contract 专项测试：
 
 ```powershell
-$py = "C:\Users\ZhuanZ（无密码）\AppData\Local\Programs\Python\Python314\python.exe"
-& $py -m pytest tests/contracts -q
-& $py -m pytest tests/r1 -q
-& $py -m pytest
+python -m pytest tests/contracts -q
+python -m pytest tests/r1 -q
+python -m pytest
 ```
 
 

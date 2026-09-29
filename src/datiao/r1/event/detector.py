@@ -58,6 +58,11 @@ def detect_student_process_events(
     ) -> None:
         source = source_mapping or mapping
         sequence = len(events)
+        start_time_ms = occurred_at_ms if occurred_at_ms is not None else mapping.start_time_ms
+        end_time_ms = occurred_at_ms if occurred_at_ms is not None else mapping.end_time_ms
+        event_quality_flags = list(quality_flags)
+        if start_time_ms is None or end_time_ms is None:
+            event_quality_flags.append("TIME_UNAVAILABLE")
         events.append(
             StudentProcessEvent(
                 event_id=f"{session_id}:event:{sequence:04d}",
@@ -69,18 +74,18 @@ def detect_student_process_events(
                 page_id=mapping.page_id,
                 data_version=data_version,
                 sequence=sequence,
-                start_time_ms=(occurred_at_ms if occurred_at_ms is not None else mapping.start_time_ms),
-                end_time_ms=(occurred_at_ms if occurred_at_ms is not None else mapping.end_time_ms),
+                start_time_ms=start_time_ms,
+                end_time_ms=end_time_ms,
                 question_id=question_id,
                 previous_question_id=previous_question_id,
                 next_question_id=next_question_id,
                 stroke_refs=(source.stroke_id,),
                 point_refs=source.point_refs,
-                quality_status="DEGRADED" if (quality_flags or mapping.status != "MAPPED") else "VALID",
+                quality_status="DEGRADED" if (event_quality_flags or mapping.status != "MAPPED") else "VALID",
                 algorithm_version="r1-event-rule-v0.1",
                 provenance=source_provenance or {},
                 mapping_confidence=confidence,
-                quality_flags=quality_flags,
+                quality_flags=tuple(dict.fromkeys(event_quality_flags)),
                 metadata=metadata or {},
             )
         )
@@ -117,6 +122,7 @@ def detect_student_process_events(
             emit(
                 "UNKNOWN",
                 mapping,
+                question_id="UNKNOWN",
                 quality_flags=mapping.quality_flags or ("UNKNOWN_MAPPING",),
                 metadata={"mapping_status": mapping.status},
             )

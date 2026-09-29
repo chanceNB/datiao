@@ -8,12 +8,12 @@
 
 - Point：`normalized`/`raw_index` 迁移到 raw/mm/norm 坐标、source index/order、pressure 和 pen state；Raw payload 与 hash 继续保留。
 - Stroke：`start_timestamp_ms`/`end_timestamp_ms`/隐含点序迁移到 `point_refs`、`start_time_ms`、`end_time_ms`、`duration_ms` 和 algorithm provenance。
-- QuestionRegion：旧 rectangle/polygon 坐标通过兼容构造保留；V1 标准字段是 `region_type` 与 `polygon_norm`。旧 synthetic 0~50 坐标标为 legacy coordinate space。
+- QuestionRegion：V1 标准字段是 `region_type` 与 0~1 的 `polygon_norm`。旧 rectangle/polygon 坐标通过独立 `LegacyQuestionRegion` 兼容类型保留，不能伪装成 V1。
 - Event：旧 `occurred_at_ms`、`source_stroke_ids`、`source_point_ids`、`source_provenance` 不再进入标准序列化；V1 使用 `start_time_ms`/`end_time_ms`、`stroke_refs`/`point_refs`、`quality_status`、`algorithm_version`、`provenance`。
 
 ## Point V1
 
-Contract version 为 `1.0.0`。Point 区分 `x_raw/y_raw`、`x_mm/y_mm` 和 `x_norm/y_norm`；没有标定或可靠页面映射时保持 `null`。`participant_id`、`task_segment_id`、`device_id` 可为 `null`。`pressure_raw=0` 与 `null` 保持区别，`pressure_norm` 未校准时为 `null`。标准 pen state 为 `DOWN/MOVE/UP/UNKNOWN`。`source_payload` 不被标准化覆盖。
+Contract version 为 `1.0.0`。Point 区分 `x_raw/y_raw`、`x_mm/y_mm` 和 `x_norm/y_norm`；没有标定或可靠页面映射时保持 `null`。内部 degraded Point 可以保留缺失的 `device_id`、`page_id`、`timestamp_ms` 或 raw 坐标；成功标准导出必须通过 Canonical Point V1 Gate。`participant_id`、`task_segment_id` 可为 `null`。`pressure_raw=0` 与 `null` 保持区别，`pressure_norm` 未校准时为 `null`。标准 pen state 为 `DOWN/MOVE/UP/UNKNOWN`。`source_payload` 不被标准化覆盖。
 
 ## Stroke V1
 
@@ -29,7 +29,7 @@ Stroke 保留 `raw_order`、`processed_order`、bbox 和 quality flags，并提�
 
 `WRITING`、`QUESTION_VISIT`、`QUESTION_LEAVE`、`RETURN`、`REVISION_CANDIDATE`、`PAGE_CHANGE`、`PROCESS_END`、`UNKNOWN`。
 
-时间满足 `end_time_ms >= start_time_ms`。`quality_status` 表示总状态（`VALID`、`DEGRADED`、`INVALID`），`quality_flags` 表示原因；UNKNOWN 事件不等于 INVALID 数据。事件通过 `point_refs` 和 `stroke_refs` 维持 Event → Stroke → Point → Raw 回查。
+时间满足 `end_time_ms >= start_time_ms`；`VALID` 事件必须同时有开始和结束时间，降级缺失时间必须有解释性质量标志。题目相关事件必须有 `question_id`，映射失败使用 `UNKNOWN`；PAGE_CHANGE 可以为 null。`quality_status` 表示总状态（`VALID`、`DEGRADED`、`INVALID`），`quality_flags` 表示原因；UNKNOWN 事件不等于 INVALID 数据。事件通过 `point_refs` 和 `stroke_refs` 维持 Event → Stroke → Point → Raw 回查。
 
 ## Synthetic provenance
 

@@ -7,6 +7,6 @@
   "properties": {
     "schema_version": {"const": "1.0.0"}, "region_id": {"type": "string", "minLength": 1}, "page_id": {"type": "string", "minLength": 1}, "question_id": {"type": "string", "minLength": 1},
     "region_type": {"enum": ["rectangle", "polygon"]}, "polygon_norm": {"type": "array", "minItems": 3, "items": {"type": "array", "prefixItems": [{"type": "number", "minimum": 0, "maximum": 1}, {"type": "number", "minimum": 0, "maximum": 1}], "items": false, "minItems": 2, "maxItems": 2}},
-    "priority": {"type": "integer"}, "coordinate_space": {"enum": ["norm", "legacy"]}
+    "priority": {"type": "integer"}, "coordinate_space": {"const": "norm"}
   }
 }

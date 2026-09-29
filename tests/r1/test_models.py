@@ -73,6 +73,8 @@ def test_forbidden_metadata_fields_are_rejected():
             sequence=0,
             start_time_ms=None,
             end_time_ms=None,
+            quality_status="DEGRADED",
+            quality_flags=("TIME_UNAVAILABLE",),
             metadata={"emotion": "unknown"},
         )
 
@@ -91,6 +93,8 @@ def test_event_default_metadata_is_immutable():
         sequence=0,
         start_time_ms=None,
         end_time_ms=None,
+        quality_status="DEGRADED",
+        quality_flags=("TIME_UNAVAILABLE",),
     )
 
     with pytest.raises(TypeError):

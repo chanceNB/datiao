@@ -7,6 +7,24 @@
   "properties": {
     "schema_version": {"const": "1.0.0"}, "event_id": {"type": "string", "minLength": 1}, "event_type": {"enum": ["WRITING", "QUESTION_VISIT", "QUESTION_LEAVE", "RETURN", "REVISION_CANDIDATE", "PAGE_CHANGE", "PROCESS_END", "UNKNOWN"]}, "session_id": {"type": "string", "minLength": 1},
     "task_segment_id": {"type": ["string", "null"]}, "participant_id": {"type": ["string", "null"]}, "question_id": {"type": ["string", "null"]}, "page_id": {"type": ["string", "null"]}, "previous_question_id": {"type": ["string", "null"]}, "next_question_id": {"type": ["string", "null"]}, "sequence": {"type": "integer", "minimum": 0},
-    "start_time_ms": {"type": ["integer", "null"]}, "end_time_ms": {"type": ["integer", "null"]}, "point_refs": {"type": "array", "items": {"type": "string"}}, "stroke_refs": {"type": "array", "items": {"type": "string"}}, "quality_status": {"enum": ["VALID", "DEGRADED", "INVALID"]}, "quality_flags": {"type": "array", "items": {"type": "string"}}, "algorithm_version": {"type": "string", "minLength": 1}, "provenance": {}, "data_version": {"type": ["string", "null"]}, "mapping_confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}, "metadata": {}
-  }
+    "start_time_ms": {"type": ["integer", "null"]}, "end_time_ms": {"type": ["integer", "null"]}, "point_refs": {"type": "array", "items": {"type": "string", "minLength": 1}}, "stroke_refs": {"type": "array", "items": {"type": "string", "minLength": 1}}, "quality_status": {"enum": ["VALID", "DEGRADED", "INVALID"]}, "quality_flags": {"type": "array", "items": {"type": "string"}}, "algorithm_version": {"type": "string", "minLength": 1}, "provenance": {}, "data_version": {"type": ["string", "null"]}, "mapping_confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}, "metadata": {}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"quality_status": {"const": "VALID"}}, "required": ["quality_status"]},
+      "then": {"properties": {"start_time_ms": {"type": "integer"}, "end_time_ms": {"type": "integer"}}}
+    },
+    {
+      "if": {"properties": {"event_type": {"enum": ["QUESTION_VISIT", "QUESTION_LEAVE", "RETURN", "REVISION_CANDIDATE"]}}, "required": ["event_type"]},
+      "then": {"properties": {"question_id": {"type": "string", "minLength": 1}}}
+    },
+    {
+      "if": {"properties": {"quality_status": {"enum": ["DEGRADED", "INVALID"]}, "start_time_ms": {"type": "null"}}, "required": ["quality_status", "start_time_ms"]},
+      "then": {"properties": {"quality_flags": {"contains": {"enum": ["MISSING_TIMESTAMP", "TIME_UNAVAILABLE", "NO_TIME_REFERENCE"]}}}}
+    },
+    {
+      "if": {"properties": {"quality_status": {"enum": ["DEGRADED", "INVALID"]}, "end_time_ms": {"type": "null"}}, "required": ["quality_status", "end_time_ms"]},
+      "then": {"properties": {"quality_flags": {"contains": {"enum": ["MISSING_TIMESTAMP", "TIME_UNAVAILABLE", "NO_TIME_REFERENCE"]}}}}
+    }
+  ]
 }

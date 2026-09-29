@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..mapper import StrokeMapping
 from ..models import EventType, Point, QuestionRegion, Stroke, StudentProcessEvent
+from .manifest import SyntheticManifest
 
 ScenarioType = Literal[
     "sequential_visit",
@@ -86,6 +87,7 @@ class SyntheticCase(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, strict=True, frozen=True, extra="forbid")
 
     scenario: Scenario
+    manifest: SyntheticManifest
     raw_points: tuple[Point, ...]
     regions: tuple[QuestionRegion, ...] = ()
     strokes: tuple[Stroke, ...] = ()

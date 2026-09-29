@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from ..event import detect_student_process_events
 from ..mapper import map_strokes_to_regions
 from ..models import Point, QuestionRegion
-from ..models.immutable import stable_json_hash
 from ..parser import parse_raw_points
 from ..stroke import build_strokes
 from .models import (
@@ -18,6 +17,7 @@ from .models import (
     SyntheticTruth,
     SyntheticTruthEvent,
 )
+from .manifest import build_synthetic_manifest, compute_manifest_hash
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,7 +177,17 @@ def _truth_for(scenario: Scenario, raw_points: tuple[Point, ...]) -> SyntheticTr
 
 def generate_synthetic_case(scenario: Scenario) -> SyntheticCase:
     raw_records = _raw_records(scenario)
-    manifest_hash = f"sha256:{stable_json_hash(raw_records)}"
+    manifest = build_synthetic_manifest(
+        dataset_id=f"synthetic:{scenario.scenario_id}",
+        scenario_id=scenario.scenario_id,
+        generator_version=scenario.generator_version,
+        seed=scenario.seed,
+        session_id=f"sim_session_{scenario.scenario_id}",
+        participant_id="sim_p_001",
+        task_segment_id="sim_segment_practice_01",
+        raw_records=raw_records,
+    )
+    manifest_hash = compute_manifest_hash(manifest)
     raw_points = parse_raw_points(raw_records)
     regions = default_regions()
     strokes = build_strokes(raw_points)
@@ -203,6 +213,7 @@ def generate_synthetic_case(scenario: Scenario) -> SyntheticCase:
     )
     return SyntheticCase(
         scenario=scenario,
+        manifest=manifest,
         raw_points=raw_points,
         regions=regions,
         strokes=strokes,

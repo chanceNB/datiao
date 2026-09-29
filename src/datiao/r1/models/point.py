@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -34,8 +35,8 @@ class Point(BaseModel):
     session_id: str = Field(min_length=1)
     participant_id: str | None = None
     task_segment_id: str | None = None
-    device_id: str | None = None
-    page_id: str | None = None
+    device_id: str | None = Field(default=None, min_length=1)
+    page_id: str | None = Field(default=None, min_length=1)
     sequence: int = Field(ge=0)
     timestamp_ms: int | None
     x_raw: float | None
@@ -90,6 +91,13 @@ class Point(BaseModel):
             raise ValueError("source_payload_hash does not match source_payload")
         return value
 
+    @field_validator("x_raw", "y_raw", "x_mm", "y_mm", "pressure_raw", "pressure_norm")
+    @classmethod
+    def validate_finite_numbers(cls, value: Any) -> Any:
+        if value is not None and not math.isfinite(float(value)):
+            raise ValueError("point numeric values must be finite")
+        return value
+
     @property
     def raw_index(self) -> int:
         return self.source_index
@@ -97,3 +105,34 @@ class Point(BaseModel):
     @property
     def normalized(self) -> NormalizedPoint:
         return NormalizedPoint(x=self.x_raw, y=self.y_raw, timestamp_ms=self.timestamp_ms, pressure=float(self.pressure_raw) if self.pressure_raw is not None else None)
+
+
+def is_canonical_v1_eligible(point: Point) -> bool:
+    """Return whether an internal Point is safe for successful V1 export."""
+
+    return all(
+        value is not None
+        for value in (point.device_id, point.page_id, point.timestamp_ms, point.x_raw, point.y_raw)
+    )
+
+
+def validate_canonical_point_for_export(point: Point) -> Point:
+    """Validate the successful Canonical Point V1 boundary without dropping Raw."""
+
+    missing = [
+        name
+        for name, value in (
+            ("device_id", point.device_id),
+            ("page_id", point.page_id),
+            ("timestamp_ms", point.timestamp_ms),
+            ("x_raw", point.x_raw),
+            ("y_raw", point.y_raw),
+        )
+        if value is None
+    ]
+    if missing:
+        raise ValueError(
+            "point is not eligible for standard Canonical Point V1 export; "
+            f"missing: {', '.join(missing)}"
+        )
+    return point

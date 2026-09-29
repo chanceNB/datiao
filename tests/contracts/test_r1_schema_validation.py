@@ -21,7 +21,7 @@ def test_all_v1_golden_examples_validate_against_draft_2020_12():
 
 def test_serialized_v1_models_round_trip_without_legacy_fields():
     event = StudentProcessEvent(
-        event_id="sim_evt_000001", event_type="RETURN", session_id="sim_session_001",
+        event_id="sim_evt_000001", event_type="RETURN", session_id="sim_session_001", question_id="Q05",
         start_time_ms=1, end_time_ms=2, point_refs=("p",), stroke_refs=("s",),
         provenance={"dataset_type": "synthetic", "generator_version": "v", "seed": 1,
                     "scenario_id": "scenario", "ground_truth_source": "scenario_plan",
