@@ -10,7 +10,7 @@ def semantic_json_hash(value):
 
 
 def semantic_run_hash(manifest):
-    excluded = {'run_hash','manifest_integrity_hash','model_file_hash','environment','wall_time','timestamp','absolute_path','hostname','username'}
+    excluded = {'run_hash','manifest_integrity_hash','model_file_hash','artifact_hashes','environment','wall_time','timestamp','absolute_path','hostname','username'}
     return semantic_json_hash({k:v for k,v in manifest.items() if k not in excluded})
 
 

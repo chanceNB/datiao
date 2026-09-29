@@ -16,7 +16,7 @@ from .config import TCNConfig
 from .data import (CAUSAL_LABELS, Normalizer, build_sequence_length_audit, collate_sequences,
                    fit_normalizer, make_loader, prepare_model_input, target_causality_audit)
 from .manifest import semantic_json_hash
-from .model import PenTCN, masked_bce_with_logits, model_state_hash
+from .model import PenTCN, masked_bce_components, masked_bce_with_logits, model_state_hash
 
 
 @dataclass
@@ -52,13 +52,17 @@ def _batch_loss(model, batch, normalizer, device):
 
 def _validation_loss(model, loader, normalizer, device):
     model.eval()
-    losses=[]
+    total_loss_sum = torch.tensor(0.0, device=device)
+    total_valid_positions = torch.tensor(0.0, device=device)
     with torch.no_grad():
         for batch in loader:
-            loss,_ = _batch_loss(model,batch,normalizer,device)
-            losses.append(float(loss))
-    if not losses: raise ValueError('empty validation loader')
-    return float(np.mean(losses))
+            model_input = prepare_model_input(batch['values'].to(device), batch['feature_mask'].to(device), normalizer)
+            logits = model(model_input)
+            loss_sum, valid_positions = masked_bce_components(logits, batch['targets'].to(device), batch['padding_mask'].to(device))
+            total_loss_sum += loss_sum
+            total_valid_positions += valid_positions
+    if total_valid_positions <= 0: raise ValueError('empty validation loader')
+    return float(total_loss_sum / total_valid_positions)
 
 
 def fit(model, train_loader, validation_loader, normalizer, config) -> TrainingResult:
@@ -66,18 +70,21 @@ def fit(model, train_loader, validation_loader, normalizer, config) -> TrainingR
     optimizer = torch.optim.AdamW(model.parameters(),lr=config.learning_rate,weight_decay=config.weight_decay)
     history=[]; best_state=None; best_loss=float('inf'); best_epoch=0; stale=0
     for epoch in range(1,config.max_epochs+1):
-        model.train(); train_losses=[]
+        model.train(); train_loss_sum=0.0; train_valid_positions=0.0
         for batch in train_loader:
             optimizer.zero_grad(set_to_none=True)
-            loss,_ = _batch_loss(model,batch,normalizer,device)
+            loss, logits = _batch_loss(model,batch,normalizer,device)
             loss.backward()
             if not all(p.grad is not None and torch.isfinite(p.grad).all() for p in model.parameters() if p.requires_grad):
                 raise ValueError('non-finite gradient')
             torch.nn.utils.clip_grad_norm_(model.parameters(),config.gradient_clip_norm)
-            optimizer.step(); train_losses.append(float(loss.detach()))
+            optimizer.step()
+            valid_positions = float(batch['padding_mask'].sum()) * logits.shape[-1]
+            train_loss_sum += float(loss.detach()) * valid_positions
+            train_valid_positions += valid_positions
         val_loss = _validation_loss(model,validation_loader,normalizer,device)
         lr=optimizer.param_groups[0]['lr']
-        history.append({'epoch':epoch,'train_masked_bce':float(np.mean(train_losses)),'validation_masked_bce':val_loss,'learning_rate':lr})
+        history.append({'epoch':epoch,'train_masked_bce':train_loss_sum / train_valid_positions,'validation_masked_bce':val_loss,'learning_rate':lr})
         if val_loss < best_loss-config.min_delta:
             best_loss=val_loss; best_epoch=epoch; stale=0
             best_state={key:tensor.detach().cpu().clone() for key,tensor in model.state_dict().items()}

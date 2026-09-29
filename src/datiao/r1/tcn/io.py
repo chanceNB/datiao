@@ -11,7 +11,7 @@ from ..lightgbm.io import reload_lightgbm_run
 from ..lightgbm.manifest import sha256_file, write_json
 from ..features.models import LABEL_ORDER
 from .data import load_tcn_dataset, Normalizer, build_sequence_length_audit, target_causality_audit, make_loader
-from .manifest import semantic_json_hash, semantic_run_hash
+from .manifest import manifest_integrity_hash, semantic_json_hash, semantic_run_hash
 from .model import PenTCN, model_state_hash
 from .train import execute_training_once, evaluate
 
@@ -68,7 +68,7 @@ def _write_manifest(result, comparison):
     artifact_hashes={relative:sha256_file(root/relative) for relative in artifact_files}
     model_file_hash=artifact_hashes['model/best_model.pt']; predictions_hash=artifact_hashes['predictions.jsonl']; metrics_hash=artifact_hashes['metrics.json']; diagnostics_hash=artifact_hashes['causal_diagnostics.json']
     payload={'run_version':'1.0.0','baseline_id':'r1-pen-tcn-v1','baseline_version':'1.0.0','source_feature_manifest_hash':result['data'].manifest.manifest_hash,'source_dataset_manifest_hash':result['data'].manifest.source_dataset_manifest_hash,'source_split_manifest_hash':result['data'].manifest.source_split_manifest_hash,'feature_order':list(result['data'].manifest.feature_order),'label_order':list(LABEL_ORDER),'sequence_count':len(result['data'].sequences),'real_timestep_count':len(result['predictions']),'split_counts':{s:sum(r['split']==s for r in result['predictions']) for s in ('train','validation','test')},'normalization_hash':result['normalizer'].semantic_hash,'config_snapshot_hash':artifact_hashes['config_snapshot.json'],'artifact_hashes':artifact_hashes,'architecture':{'input_channels':24,'hidden_channels':[32,32],'kernel_size':2,'dilations':[1,2],'convs_per_block':2,'dropout':.1,'output_channels':8,'receptive_field':result['model'].receptive_field,'parameter_count':result['model'].parameter_count},'seed':20260929,'device':'cpu','threshold':.5,'best_epoch':result['training'].best_epoch,'best_validation_loss':result['training'].best_validation_loss,'model_file_hash':model_file_hash,'model_state_hash':result['model_state_hash'],'predictions_hash':predictions_hash,'metrics_hash':metrics_hash,'causal_diagnostics_hash':diagnostics_hash,'comparison_hash':comparison_hash,'comparison':comparison}
-    payload['run_hash']=semantic_run_hash(payload); write_json(root/'run_manifest.json',payload); return payload
+    payload['run_hash']=semantic_run_hash(payload); payload['manifest_integrity_hash']=manifest_integrity_hash(payload); write_json(root/'run_manifest.json',payload); return payload
 
 
 def reload_tcn_run(output, features):
@@ -81,6 +81,7 @@ def reload_tcn_run(output, features):
     if sha256_file(root/'metrics.json') != manifest['metrics_hash']: raise ValueError('metrics hash mismatch')
     if sha256_file(root/'causal_diagnostics.json') != manifest['causal_diagnostics_hash']: raise ValueError('diagnostics hash mismatch')
     if semantic_run_hash(manifest) != manifest['run_hash']: raise ValueError('run hash mismatch')
+    if manifest_integrity_hash(manifest) != manifest['manifest_integrity_hash']: raise ValueError('manifest integrity hash mismatch')
     normalization_payload=json.loads((root/'normalization.json').read_text(encoding='utf-8'))
     normalizer=Normalizer.from_dict(normalization_payload)
     if normalizer.semantic_hash != manifest['normalization_hash']: raise ValueError('normalization hash mismatch')

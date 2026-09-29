@@ -1,6 +1,6 @@
 import torch
 
-from datiao.r1.tcn.model import PenTCN, compute_receptive_field, masked_bce_with_logits
+from datiao.r1.tcn.model import PenTCN, compute_receptive_field, masked_bce_components, masked_bce_with_logits
 
 
 def test_fixed_receptive_field_is_computed_from_architecture():
@@ -46,6 +46,15 @@ def test_masked_loss_ignores_padding_targets():
     targets[:, 2] = 1.0
     second = masked_bce_with_logits(logits, targets, mask)
     assert torch.equal(first, second)
+
+
+def test_masked_bce_components_returns_global_sum_and_valid_label_count():
+    logits = torch.zeros(1, 3, 2)
+    targets = torch.tensor([[[1., 0.], [1., 0.], [0., 1.]]])
+    padding = torch.tensor([[1., 1., 0.]])
+    loss_sum, valid_count = masked_bce_components(logits, targets, padding)
+    assert valid_count.item() == 4
+    assert torch.allclose(loss_sum, torch.tensor(4 * 0.6931471805599453), atol=1e-6)
 
 
 def test_real_optimizer_step_changes_trainable_parameter_and_stays_finite():

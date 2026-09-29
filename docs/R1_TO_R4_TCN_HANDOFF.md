@@ -7,3 +7,5 @@ The model is strictly causal: every temporal convolution pads on the left only, 
 The eight-label target is deliberately retained. `QUESTION_LEAVE` is retrospective and `PROCESS_END` requires an external signal, so causal-subset diagnostics must not replace canonical eight-label evaluation. Use `metrics.json` for the canonical task and `causal_diagnostics.json` only for interpretation.
 
 Before downstream changes, reload `artifacts/r1_tcn_v1` and verify `audits/input_integrity.json`, `audits/normalizer.json`, `audits/causality.json`, `audits/padding.json`, `audits/model_reload.json`, and `audits/reproducibility.json`. Any source manifest or label-order drift is a compatibility failure. Hyperparameter tuning, TCN V2, Transformer, real-data training, fusion, vision, agent, and frontend work are outside this handoff.
+
+The semantic run hash intentionally excludes checkpoint/container and environment artifact bytes. Use `manifest_integrity_hash` plus `artifact_hashes` for full manifest and file integrity. Validation BCE and epoch history use global valid-label-position weighting; the fixed 200-epoch cap remains unchanged.

@@ -136,3 +136,5 @@ python -m pip install -e ".[test,ml,dl]"
 ```
 
 The fixed run is documented in [R1_TASK_R1_09.md](R1_TASK_R1_09.md). It reads the frozen Feature Builder output, fits normalization on train timesteps only, trains the strict causal Pen TCN, compares canonical eight-label metrics with the frozen LightGBM run after inference, reloads the checkpoint, and performs an independent Run2 reproducibility check. Do not use the test split for normalization, early stopping, architecture, threshold selection, or checkpoint selection.
+
+For the semantic-hash and global-validation-BCE correction, see [R1_TASK_R1_09_FIX_01.md](R1_TASK_R1_09_FIX_01.md). The artifact container hash is kept for integrity while excluded from semantic experiment identity.

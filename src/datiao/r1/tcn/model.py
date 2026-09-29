@@ -60,12 +60,20 @@ class PenTCN(nn.Module):
         return logits
 
 
-def masked_bce_with_logits(logits, targets, padding_mask):
-    denominator = padding_mask.sum()*logits.shape[-1]
-    if denominator <= 0:
+def masked_bce_components(logits, targets, padding_mask):
+    valid_positions = padding_mask.sum() * logits.shape[-1]
+    if valid_positions <= 0:
         raise ValueError('no real label positions')
     losses = F.binary_cross_entropy_with_logits(logits,targets,reduction='none')
-    loss = (losses*padding_mask[...,None]).sum()/denominator
+    loss_sum = (losses*padding_mask[...,None]).sum()
+    if not torch.isfinite(loss_sum) or not torch.isfinite(valid_positions):
+        raise ValueError('non-finite loss')
+    return loss_sum, valid_positions
+
+
+def masked_bce_with_logits(logits, targets, padding_mask):
+    loss_sum, valid_positions = masked_bce_components(logits, targets, padding_mask)
+    loss = loss_sum / valid_positions
     if not torch.isfinite(loss):
         raise ValueError('non-finite loss')
     return loss
