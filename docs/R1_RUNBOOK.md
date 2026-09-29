@@ -138,3 +138,14 @@ python -m pip install -e ".[test,ml,dl]"
 The fixed run is documented in [R1_TASK_R1_09.md](R1_TASK_R1_09.md). It reads the frozen Feature Builder output, fits normalization on train timesteps only, trains the strict causal Pen TCN, compares canonical eight-label metrics with the frozen LightGBM run after inference, reloads the checkpoint, and performs an independent Run2 reproducibility check. Do not use the test split for normalization, early stopping, architecture, threshold selection, or checkpoint selection.
 
 For the semantic-hash and global-validation-BCE correction, see [R1_TASK_R1_09_FIX_01.md](R1_TASK_R1_09_FIX_01.md). The artifact container hash is kept for integrity while excluded from semantic experiment identity.
+
+## R1 Baseline Freeze V1 and R4 handoff
+
+The completed R1 dataset, feature contract, LightGBM baseline, and Pen TCN baseline are recorded in [R1_BASELINE_FREEZE_V1.md](R1_BASELINE_FREEZE_V1.md), with the canonical manifest at `manifests/r1_baseline_freeze_v1.json`. Validate the local materialization before downstream use:
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m datiao.r1.freeze.validator
+```
+
+The read-only builder can recreate the reports from the existing frozen inputs with `python -m datiao.r1.freeze.builder --overwrite`; it does not train or tune a model. R4 experiment rules and immutable inputs are in [R1_TO_R4_EXPERIMENT_HANDOFF.md](R1_TO_R4_EXPERIMENT_HANDOFF.md). The freeze remains synthetic-only and reports complementary baselines without a winner field.
