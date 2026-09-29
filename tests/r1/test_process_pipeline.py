@@ -66,15 +66,17 @@ def test_mapping_and_return_event_sequence_is_deterministic():
     events = detect_student_process_events(mappings)
 
     assert [event.event_type for event in events] == [
+        "WRITING",
         "QUESTION_VISIT",
+        "WRITING",
         "QUESTION_LEAVE",
         "QUESTION_VISIT",
+        "WRITING",
         "QUESTION_LEAVE",
         "RETURN",
-        "PROCESS_END",
     ]
-    assert events[4].question_id == "q1"
-    assert events[4].source_stroke_ids == (strokes[2].stroke_id,)
+    assert events[7].question_id == "q1"
+    assert events[7].source_stroke_ids == (strokes[2].stroke_id,)
     assert events[-1].source_point_ids == strokes[-1].raw_order
 
     traces = resolve_event_traces(events, strokes, points)
@@ -94,29 +96,31 @@ def test_page_change_and_unknown_mapping_are_explicit():
     events = detect_student_process_events(mappings)
 
     assert [event.event_type for event in events] == [
+        "WRITING",
         "QUESTION_VISIT",
         "PAGE_CHANGE",
+        "WRITING",
         "QUESTION_LEAVE",
         "QUESTION_VISIT",
         "PAGE_CHANGE",
+        "WRITING",
         "QUESTION_LEAVE",
         "UNKNOWN",
-        "PROCESS_END",
     ]
-    assert events[1].metadata["from_page_id"] == "p-1"
-    assert events[1].metadata["to_page_id"] == "p-2"
+    assert events[2].metadata["from_page_id"] == "p-1"
+    assert events[2].metadata["to_page_id"] == "p-2"
 
 
-def test_same_question_new_stroke_is_only_a_revision_candidate():
+def test_same_question_new_stroke_is_only_writing_without_revision_evidence():
     _points, _strokes, mappings = pipeline(
         [("p-1", 2.0, 2.0), ("p-1", 2.0, 2.0)]
     )
 
     events = detect_student_process_events(mappings)
     assert [event.event_type for event in events] == [
+        "WRITING",
         "QUESTION_VISIT",
-        "REVISION_CANDIDATE",
-        "PROCESS_END",
+        "WRITING",
     ]
     assert all("emotion" not in event.metadata for event in events)
 
@@ -205,8 +209,8 @@ def test_unified_pipeline_propagates_contract_fields_and_trace():
     assert result.quality_status == "OK"
     assert result.points and result.strokes and result.stroke_mappings
     assert [event.event_type for event in result.student_process_events] == [
+        "WRITING",
         "QUESTION_VISIT",
-        "PROCESS_END",
     ]
     assert all(event.task_segment_id == "segment-7" for event in result.student_process_events)
     assert all(event.data_version == "points-v2" for event in result.student_process_events)
@@ -235,8 +239,8 @@ def test_unified_pipeline_unknown_mapping_is_degraded_and_keeps_sources():
     assert result.quality_status == "DEGRADED"
     assert result.stroke_mappings[0].status == "UNKNOWN"
     assert [event.event_type for event in result.student_process_events] == [
+        "WRITING",
         "UNKNOWN",
-        "PROCESS_END",
     ]
     assert result.student_process_events[0].source_point_ids == ("p-1", "p-2")
 

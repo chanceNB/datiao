@@ -23,6 +23,13 @@ ScenarioType = Literal[
     "missing_point",
     "duplicate_point",
     "out_of_order",
+    "continuous_same_question_writing",
+    "true_revision_overlap",
+    "same_question_no_overlap",
+    "explicit_process_end",
+    "open_process_no_end",
+    "spatial_jump_split",
+    "arc_length_cross_region",
 ]
 
 
@@ -48,6 +55,13 @@ class Scenario:
             "missing_point",
             "duplicate_point",
             "out_of_order",
+            "continuous_same_question_writing",
+            "true_revision_overlap",
+            "same_question_no_overlap",
+            "explicit_process_end",
+            "open_process_no_end",
+            "spatial_jump_split",
+            "arc_length_cross_region",
         }:
             raise ValueError(f"unsupported scenario_type: {self.scenario_type}")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):

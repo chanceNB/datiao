@@ -7,8 +7,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .event import detect_student_process_events
-from .mapper import StrokeMapping, map_strokes_to_regions
+from .event import EventDetectionConfig, detect_student_process_events
+from .mapper import QuestionMappingConfig, StrokeMapping, map_strokes_to_regions
 from .models import Point, QuestionRegion, StudentProcessEvent, Stroke
 from .models.immutable import freeze_json
 from .parser import CanonicalPointAdapter, PointRecordAdapter, parse_raw_points
@@ -54,6 +54,10 @@ def run_r1_pipeline(
     adapter: PointRecordAdapter | None = None,
     stroke_config: StrokeBuildConfig | None = None,
     min_coverage: float = 0.5,
+    mapping_config: QuestionMappingConfig | None = None,
+    event_config: EventDetectionConfig | None = None,
+    process_end_signal: bool = False,
+    session_end_ms: int | None = None,
     source_provenance: Mapping[str, Any] | None = None,
 ) -> R1ProcessResult:
     """Run canonicalization, parsing, strokes, mapping, events and trace checks.
@@ -82,9 +86,15 @@ def run_r1_pipeline(
         points,
         regions,
         min_coverage=min_coverage,
+        config=mapping_config,
     )
     events = detect_student_process_events(
         mappings,
+        strokes=strokes,
+        points=points,
+        config=event_config,
+        process_end_signal=process_end_signal,
+        session_end_ms=session_end_ms,
         task_segment_id=task_segment_id,
         data_version=data_version,
         source_provenance=source_provenance,

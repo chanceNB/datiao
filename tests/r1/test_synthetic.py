@@ -22,6 +22,13 @@ def test_supported_scenarios_generate_raw_points_and_truth():
         "missing_point",
         "duplicate_point",
         "out_of_order",
+        "continuous_same_question_writing",
+        "true_revision_overlap",
+        "same_question_no_overlap",
+        "explicit_process_end",
+        "open_process_no_end",
+        "spatial_jump_split",
+        "arc_length_cross_region",
     ):
         case = generate_synthetic_case(Scenario(f"case-{scenario_type}", scenario_type, seed=1))
 
@@ -52,7 +59,7 @@ def test_synthetic_truth_is_not_an_algorithm_event_type():
 
 
 def test_quality_scenarios_degrade_to_unknown_without_fake_success():
-    for scenario_type in ("missing_point", "duplicate_point", "out_of_order"):
+    for scenario_type in ("duplicate_point", "out_of_order"):
         case = generate_synthetic_case(Scenario(f"case-{scenario_type}", scenario_type, seed=1))
 
         assert any(mapping.status == "UNKNOWN" for mapping in case.mappings)

@@ -37,10 +37,18 @@ def _action_plan(scenario: Scenario) -> tuple[_Action, ...]:
     q2 = _Action("page-01", "q-02", 25.0, 5.0)
     q3 = _Action("page-01", "q-03", 45.0, 5.0)
     page2 = _Action("page-02", "q-04", 5.0, 5.0)
+    q1_return = _Action("page-01", "q-01", 5.0, 8.0)
     plans = {
         "sequential_visit": (q1, q2, q3),
-        "return_visit": (q1, q2, q1),
+        "return_visit": (q1, q2, q1_return),
         "revision_candidate": (q1, q1),
+        "continuous_same_question_writing": (q1, q1),
+        "true_revision_overlap": (q1, q1),
+        "same_question_no_overlap": (_Action("page-01", "q-01", 5.0, 2.0), _Action("page-01", "q-01", 5.0, 8.0)),
+        "explicit_process_end": (q1,),
+        "open_process_no_end": (q1,),
+        "spatial_jump_split": (q1, q2),
+        "arc_length_cross_region": (q1, q2),
         "cross_question_jump": (q1, q3),
         "page_change": (q1, page2),
         "unknown_page": (
@@ -86,7 +94,14 @@ def _raw_records(scenario: Scenario) -> tuple[dict[str, object], ...]:
             point_id = f"sim_{scenario.scenario_id}_point_{point_counter:03d}"
             if action.duplicate_point and point_index == 1:
                 point_id = f"sim_{scenario.scenario_id}_point_{point_counter - 1:03d}"
-            timestamp: int | None = action_index * 2_000 + point_index * 50
+            if scenario.scenario_type == "continuous_same_question_writing":
+                timestamp = action_index * 1_200 + point_index * 50
+            elif scenario.scenario_type in {"true_revision_overlap", "revision_candidate", "same_question_no_overlap"}:
+                timestamp = action_index * 5_000 + point_index * 50
+            elif scenario.scenario_type == "spatial_jump_split":
+                timestamp = action_index * 200 + point_index * 50
+            else:
+                timestamp = action_index * 2_000 + point_index * 50
             if action.missing_timestamp and point_index == 0:
                 timestamp = None
             sequence = action_index * 2 + point_index
@@ -151,6 +166,8 @@ def _truth_for(scenario: Scenario, raw_points: tuple[Point, ...]) -> SyntheticTr
             add("PAGE_CHANGE", index)
         active_page = action.page_id
 
+        add("WRITING", index, action.question_id)
+
         if action.expected_unknown:
             if active_question is not None:
                 add("QUESTION_LEAVE", index - 1, active_question)
@@ -163,14 +180,15 @@ def _truth_for(scenario: Scenario, raw_points: tuple[Point, ...]) -> SyntheticTr
         if active_question is None:
             add("RETURN" if question_id in visited else "QUESTION_VISIT", index, question_id)
         elif active_question == question_id:
-            add("REVISION_CANDIDATE", index, question_id)
+            if scenario.scenario_type in {"revision_candidate", "true_revision_overlap"}:
+                add("REVISION_CANDIDATE", index, question_id)
         else:
             add("QUESTION_LEAVE", index - 1, active_question)
             add("RETURN" if question_id in visited else "QUESTION_VISIT", index, question_id)
         visited.add(question_id)
         active_question = question_id
 
-    if actions:
+    if actions and scenario.scenario_type == "explicit_process_end":
         add("PROCESS_END", len(actions) - 1, active_question)
     return SyntheticTruth(scenario_id=scenario.scenario_id, truth_events=tuple(truth_events))
 
@@ -202,12 +220,15 @@ def generate_synthetic_case(scenario: Scenario) -> SyntheticCase:
     }
     events = detect_student_process_events(
         mappings,
+        strokes=strokes,
+        points=raw_points,
+        process_end_signal=scenario.scenario_type == "explicit_process_end",
         task_segment_id="sim_segment_practice_01",
         source_provenance=provenance,
     )
     truth = _truth_for(scenario, raw_points)
     algorithm_output = SyntheticAlgorithmOutput(
-        algorithm_version="r1.algorithm.v1",
+        algorithm_version="r1.algorithm.v2",
         implemented=True,
         events=events,
     )

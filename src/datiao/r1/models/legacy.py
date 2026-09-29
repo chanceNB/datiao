@@ -126,5 +126,5 @@ def legacy_event(data: Mapping[str, Any]) -> StudentProcessEvent:
         page_id=data.get("page_id"), sequence=int(data.get("sequence", 0)), start_time_ms=occurred, end_time_ms=occurred,
         point_refs=tuple(data.get("source_point_ids", ())), stroke_refs=tuple(data.get("source_stroke_ids", ())),
         quality_status=quality_status, quality_flags=tuple(dict.fromkeys(quality_flags)),
-        algorithm_version="r1-event-rule-v0.1", provenance=data.get("source_provenance", {}), metadata=data.get("metadata", {}),
+        algorithm_version="r1-event-rule-v0.2", provenance=data.get("source_provenance", {}), metadata=data.get("metadata", {}),
     )

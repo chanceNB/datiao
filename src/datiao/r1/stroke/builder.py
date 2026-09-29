@@ -5,14 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..models import BoundingBox, Point, Stroke
+from .geometry import path_length, point_distance
 from .quality import point_sequence, point_timestamp, stroke_quality_flags
 
 
 @dataclass(frozen=True, slots=True)
 class StrokeBuildConfig:
-    """First-version stroke segmentation configuration."""
+    """Deterministic segmentation thresholds (development defaults)."""
 
     max_time_gap_ms: int = 1_000
+    max_spatial_jump_norm: float = 0.15
+    use_pen_state: bool = True
 
     def __post_init__(self) -> None:
         if (
@@ -21,10 +24,17 @@ class StrokeBuildConfig:
             or self.max_time_gap_ms < 0
         ):
             raise ValueError("max_time_gap_ms must be a non-negative integer")
+        if isinstance(self.max_spatial_jump_norm, bool) or not isinstance(self.max_spatial_jump_norm, (int, float)) or self.max_spatial_jump_norm < 0:
+            raise ValueError("max_spatial_jump_norm must be a non-negative number")
 
 
 def _same_context(previous: Point, current: Point) -> bool:
-    return previous.session_id == current.session_id and previous.page_id == current.page_id
+    return (
+        previous.session_id == current.session_id
+        and previous.participant_id == current.participant_id
+        and previous.task_segment_id == current.task_segment_id
+        and previous.page_id == current.page_id
+    )
 
 
 def _time_continuous(previous: Point, current: Point, config: StrokeBuildConfig) -> bool:
@@ -33,6 +43,32 @@ def _time_continuous(previous: Point, current: Point, config: StrokeBuildConfig)
     if previous_time is None or current_time is None:
         return False
     return abs(current_time - previous_time) <= config.max_time_gap_ms
+
+
+def _spatial_continuous(previous: Point, current: Point, config: StrokeBuildConfig) -> bool:
+    result = point_distance(previous, current, "norm")
+    return result.distance is None or result.distance <= config.max_spatial_jump_norm
+
+
+def _pen_boundary(previous: Point, current: Point, *, contact_open: bool, config: StrokeBuildConfig) -> tuple[bool, bool]:
+    """Apply DOWN/MOVE/UP as a contact state machine.
+
+    A DOWN starts a contact only after a closed contact.  MOVE continues it,
+    and UP closes it after being included in the current Stroke.  UNKNOWN
+    falls back to time/spatial/context rules.
+    """
+
+    if not config.use_pen_state or (previous.pen_state == "UNKNOWN" and current.pen_state == "UNKNOWN"):
+        return False, contact_open
+    if current.pen_state == "DOWN":
+        if previous.pen_state == "UP":
+            return True, True
+        return False, True
+    if current.pen_state == "MOVE":
+        return False, contact_open
+    if current.pen_state == "UP":
+        return False, False
+    return False, contact_open
 
 
 def _processed_order(points: tuple[Point, ...]) -> tuple[str, ...]:
@@ -75,6 +111,7 @@ def _bbox(points: tuple[Point, ...]) -> BoundingBox:
 def _make_stroke(stroke_index: int, points: tuple[Point, ...]) -> Stroke:
     timestamps = [point_timestamp(point) for point in points]
     known_timestamps = [timestamp for timestamp in timestamps if timestamp is not None]
+    norm_path = path_length(points, "norm")
     return Stroke(
         stroke_id=f"stroke-{stroke_index:04d}",
         session_id=points[0].session_id,
@@ -88,8 +125,8 @@ def _make_stroke(stroke_index: int, points: tuple[Point, ...]) -> Stroke:
         end_time_ms=max(known_timestamps) if known_timestamps else None,
         bbox=_bbox(points),
         quality_flags=stroke_quality_flags(points),
-        algorithm_version="r1-stroke-rule-v1",
-        provenance={"builder": "stroke_builder"},
+        algorithm_version="r1-stroke-rule-v2",
+        provenance={"builder": "stroke_builder", "path_length_norm": norm_path},
     )
 
 
@@ -101,12 +138,22 @@ def build_strokes(points: tuple[Point, ...], config: StrokeBuildConfig | None = 
         return ()
 
     groups: list[list[Point]] = [[points[0]]]
+    contact_open = points[0].pen_state == "DOWN"
     for point in points[1:]:
         previous = groups[-1][-1]
-        if _same_context(previous, point) and _time_continuous(previous, point, config):
+        pen_split, next_contact_open = _pen_boundary(previous, point, contact_open=contact_open, config=config)
+        should_split = (
+            not _same_context(previous, point)
+            or (previous.timestamp_ms is None or point.timestamp_ms is None)
+            or not _time_continuous(previous, point, config)
+            or not _spatial_continuous(previous, point, config)
+            or pen_split
+        )
+        if not should_split:
             groups[-1].append(point)
         else:
             groups.append([point])
+        contact_open = next_contact_open if not should_split else point.pen_state == "DOWN"
     return tuple(
         _make_stroke(index, tuple(group))
         for index, group in enumerate(groups)

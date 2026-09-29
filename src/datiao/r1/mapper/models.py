@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 MappingStatus = Literal["MAPPED", "UNKNOWN", "AMBIGUOUS"]
+MappingMethod = Literal["ARC_LENGTH", "POINT_FALLBACK", "UNKNOWN"]
 
 
 class StrokeMapping(BaseModel):
@@ -25,6 +26,8 @@ class StrokeMapping(BaseModel):
     end_time_ms: int | None = None
     point_refs: tuple[str, ...] = ()
     quality_flags: tuple[str, ...] = ()
+    algorithm_version: str = "r1-qmap-arc-v1"
+    mapping_method: MappingMethod = "UNKNOWN"
 
     @model_validator(mode="before")
     @classmethod

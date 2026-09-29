@@ -1,7 +1,7 @@
 """R1 point-matrix process foundation."""
 
-from .event import detect_student_process_events
-from .mapper import StrokeMapping, map_strokes_to_regions
+from .event import EventDetectionConfig, detect_student_process_events
+from .mapper import QuestionMappingConfig, StrokeMapping, map_strokes_to_regions
 from .models import Point, QuestionRegion, StudentProcessEvent, Stroke
 from .pipeline import R1ProcessResult, run_r1_pipeline
 from .replay import PageReplay, ReplayFrame, build_page_replay
@@ -24,6 +24,8 @@ __all__ = [
     "StudentProcessEvent",
     "Stroke",
     "StrokeMapping",
+    "EventDetectionConfig",
+    "QuestionMappingConfig",
     "detect_student_process_events",
     "map_strokes_to_regions",
     "run_r1_pipeline",
