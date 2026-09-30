@@ -18,4 +18,6 @@
 - [x] Batch semantic rule IDs are version-controlled for non-Python R3 consumers.
 - [x] Public `run_r1_pipeline` result handoff covers RETURN, UNKNOWN, REVISION_CANDIDATE, and PROCESS_END.
 - [x] R1 Core Event and R3 transport payload remain separate.
+- [x] LIVE-01 standard-library client, response DTO, deterministic request serialization, and offline parser tests are implemented.
+- [ ] R3 endpoint reachable and registered for exact R1 IDs (`BLOCKED_R3_NOT_READY` at this run).
 - [ ] Live R1↔R3 integration acceptance by R3.
