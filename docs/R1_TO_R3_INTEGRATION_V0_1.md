@@ -34,7 +34,11 @@ The existing R1 core contract and `contracts/golden/r1_event_example.json` remai
 
 The Event JSON Schema is the structural gate. `R1R3EventV01` is the semantic gate for time ordering, VALID timestamps, non-empty refs, synthetic provenance and IDs, and concrete algorithm versions. External point and stroke existence remains an exporter gate.
 
+Event Wire V0.1 provenance is a controlled six-field object with `additionalProperties: false`. Non-synthetic provenance may be empty or identify `dataset_type: real`; adding other provenance fields requires a future contract minor version.
+
 The Batch JSON Schema is `contracts/r1_to_r3_event_batch_v0_1.schema.json`. `R1R3EventBatchV01` repeats the semantic gate for non-empty batches, session, task segment and algorithm consistency, and concrete dataset and algorithm versions.
+
+`contracts/r1_to_r3_batch_semantics_v0_1.json` lists the semantic rule IDs that R3 services must mirror. JSON Schema PASS does not by itself prove these cross-field consistency rules.
 
 ## Batch consistency
 

@@ -34,6 +34,7 @@
     "algorithm_version": {"type": "string", "minLength": 1},
     "provenance": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "dataset_type": {"type": "string"},
         "generator_version": {"type": "string", "minLength": 1},
@@ -55,7 +56,16 @@
       }
     },
     {
-      "if": {"properties": {"provenance": {"properties": {"dataset_type": {"const": "synthetic"}}}}, "required": ["provenance"]},
+      "if": {
+        "properties": {
+          "provenance": {
+            "type": "object",
+            "properties": {"dataset_type": {"const": "synthetic"}},
+            "required": ["dataset_type"]
+          }
+        },
+        "required": ["provenance"]
+      },
       "then": {
         "properties": {
           "provenance": {

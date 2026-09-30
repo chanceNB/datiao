@@ -17,7 +17,7 @@ from datiao.r1.models import StudentProcessEvent
 from datiao.r1.models.legacy import legacy_rectangle
 from datiao.r1.pipeline import run_r1_pipeline
 from datiao.r1.synthetic import Scenario, generate_synthetic_case
-from datiao.r1.synthetic import Scenario, generate_synthetic_case
+from datiao.r1.synthetic import compute_manifest_hash
 
 
 def make_event(event_type="RETURN", **kwargs):
@@ -244,6 +244,39 @@ def test_golden_batch_validates_as_schema_and_dto():
     assert R1R3EventBatchV01.model_validate_json(golden_path.read_text(encoding="utf-8"))
 
 
+def _validate_event_schema(payload):
+    schema = json.loads(Path("contracts/r1_to_r3_event_v0_1.schema.json").read_text(encoding="utf-8"))
+    return sorted(Draft202012Validator(schema).iter_errors(payload), key=str)
+
+
+def test_schema_and_dto_parity_for_synthetic_real_and_forbidden_provenance():
+    valid = export(make_event()).model_dump(mode="json")
+    assert not _validate_event_schema(valid)
+
+    missing_generator = {**valid, "provenance": {**valid["provenance"], "generator_version": None}}
+    assert _validate_event_schema(missing_generator)
+    with pytest.raises(ValidationError):
+        R1R3EventV01.model_validate(missing_generator)
+
+    bad_hash = {**valid, "provenance": {**valid["provenance"], "manifest_hash": "sha256:REPLACE_WITH_REAL_HASH"}}
+    assert _validate_event_schema(bad_hash)
+    with pytest.raises(ValidationError):
+        R1R3EventV01.model_validate(bad_hash)
+
+    forbidden = {**valid, "provenance": {**valid["provenance"], "emotion": "anxious"}}
+    assert _validate_event_schema(forbidden)
+    with pytest.raises(ValidationError):
+        R1R3EventV01.model_validate(forbidden)
+
+    real = {**valid, "session_id": "real-session", "participant_id": None, "task_segment_id": None, "provenance": {}}
+    assert not _validate_event_schema(real)
+    assert R1R3EventV01.model_validate(real).provenance.model_dump(exclude_none=True) == {}
+
+    real_tagged = {**real, "provenance": {"dataset_type": "real"}}
+    assert not _validate_event_schema(real_tagged)
+    assert R1R3EventV01.model_validate(real_tagged).provenance.dataset_type == "real"
+
+
 def test_public_pipeline_covers_required_four_synthetic_scenarios():
     for scenario_type, expected in (
         ("return_visit", "RETURN"),
@@ -274,7 +307,7 @@ def test_public_pipeline_covers_required_four_synthetic_scenarios():
             "seed": case.scenario.seed,
             "scenario_id": case.scenario.scenario_id,
             "ground_truth_source": "scenario_plan",
-            "manifest_hash": case.manifest.raw_records_hash,
+            "manifest_hash": compute_manifest_hash(case.manifest),
         }
         result = run_r1_pipeline(
             records,
@@ -292,3 +325,7 @@ def test_public_pipeline_covers_required_four_synthetic_scenarios():
         )
         assert any(event.event_type == expected for event in batch.events)
         assert result.model_dump(mode="json") == before
+        assert all(
+            event.provenance["manifest_hash"] == compute_manifest_hash(case.manifest)
+            for event in batch.events
+        )

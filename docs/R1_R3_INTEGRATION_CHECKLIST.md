@@ -14,6 +14,8 @@
 - [x] Event DTO semantic gates enforce time ordering, VALID timestamps, provenance, identity, and concrete versions.
 - [x] Batch DTO validates non-empty input and session, task segment, algorithm, dataset, and version consistency.
 - [x] Batch Draft 2020-12 schema and version-controlled golden validate through a local `$ref` resolver.
+- [x] Controlled provenance rejects unknown or forbidden fields at both DTO and Schema layers.
+- [x] Batch semantic rule IDs are version-controlled for non-Python R3 consumers.
 - [x] Public `run_r1_pipeline` result handoff covers RETURN, UNKNOWN, REVISION_CANDIDATE, and PROCESS_END.
 - [x] R1 Core Event and R3 transport payload remain separate.
 - [ ] Live R1↔R3 integration acceptance by R3.
