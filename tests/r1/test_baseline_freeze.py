@@ -7,6 +7,7 @@ import pytest
 
 from datiao.r1.freeze.builder import build_freeze
 from datiao.r1.freeze.validator import validate_freeze
+from datiao.r1.tcn.manifest import semantic_json_hash
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +21,9 @@ def test_freeze_artifact_validates_and_has_no_winner():
     manifest = json.loads((FREEZE / "freeze_manifest.json").read_text(encoding="utf-8"))
     canonical = json.loads(CANONICAL.read_text(encoding="utf-8"))
     comparison = json.loads((FREEZE / "baseline_comparison.json").read_text(encoding="utf-8"))
+    lightgbm_metrics = json.loads((ROOT / "artifacts" / "r1_lightgbm_v1" / "metrics.json").read_text(encoding="utf-8"))
+    tcn_metrics = json.loads((ROOT / "artifacts" / "r1_tcn_v1" / "metrics.json").read_text(encoding="utf-8"))
+    tcn_comparison = json.loads((ROOT / "artifacts" / "r1_tcn_v1" / "comparison_lightgbm.json").read_text(encoding="utf-8"))
     assert manifest == canonical
     assert manifest["status"] == "FROZEN"
     assert manifest["source_baseline_commit"] == "2846c7f7346ebe36f12fe63fb5813e2d230c162a"
@@ -34,6 +38,20 @@ def test_freeze_artifact_validates_and_has_no_winner():
     ]
     assert comparison["description"]
     assert "winner" not in comparison
+    assert set(manifest["metrics"]) == {"lightgbm", "pen_tcn"}
+    metric_keys = {"micro_f1", "macro_f1_all_labels", "macro_roc_auc_evaluable_labels", "macro_average_precision_evaluable_labels", "hamming_loss", "subset_accuracy"}
+    for model, source in (("lightgbm", lightgbm_metrics), ("pen_tcn", tcn_metrics)):
+        source_test_key = "test"
+        assert set(manifest["metrics"][model]) == {"validation", "synthetic_test"}
+        assert set(manifest["metrics"][model]["validation"]) == metric_keys
+        assert set(manifest["metrics"][model]["synthetic_test"]) == metric_keys
+        assert manifest["metrics"][model]["validation"] == {key: source["validation"]["aggregate"][key] for key in metric_keys}
+        assert manifest["metrics"][model]["synthetic_test"] == {key: source[source_test_key]["aggregate"][key] for key in metric_keys}
+    assert manifest["comparison_summary"]["synthetic_test"]["tcn_minus_lightgbm"]["micro_f1"] == pytest.approx(0.018523630631603782)
+    assert manifest["causal_diagnostics"]["labels"] == ["WRITING", "QUESTION_VISIT", "RETURN", "REVISION_CANDIDATE", "PAGE_CHANGE", "UNKNOWN"]
+    for split, source_split in (("validation", "validation"), ("synthetic_test", "test")):
+        assert manifest["causal_diagnostics"][split]["pen_tcn"] == {key: tcn_comparison["causal_diagnostics"][source_split]["aggregate"][key] for key in metric_keys}
+        assert manifest["causal_diagnostics"][split]["lightgbm"] == {key: tcn_comparison["lightgbm_causal_diagnostics"][source_split]["aggregate"][key] for key in metric_keys}
 
 
 def test_freeze_builder_has_no_training_entrypoints():
@@ -55,6 +73,39 @@ def test_freeze_manifest_tamper_is_rejected(tmp_path):
     tampered_path = output / "freeze_manifest.json"
     tampered_path.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(ValueError, match="freeze manifest hash mismatch"):
+        validate_freeze(output=output, canonical=canonical)
+
+
+def _copy_freeze_for_manifest_tamper(tmp_path, mutate):
+    output = tmp_path / "freeze"
+    shutil.copytree(FREEZE, output)
+    canonical = tmp_path / "canonical.json"
+    shutil.copy2(CANONICAL, canonical)
+    manifest = json.loads((output / "freeze_manifest.json").read_text(encoding="utf-8"))
+    mutate(manifest)
+    manifest["freeze_manifest_hash"] = semantic_json_hash({key: value for key, value in manifest.items() if key != "freeze_manifest_hash"})
+    encoded = json.dumps(manifest)
+    (output / "freeze_manifest.json").write_text(encoded, encoding="utf-8")
+    canonical.write_text(encoded, encoding="utf-8")
+    return output, canonical
+
+
+@pytest.mark.parametrize("model", ["lightgbm", "pen_tcn"])
+def test_tampered_canonical_metric_is_rejected(tmp_path, model):
+    output, canonical = _copy_freeze_for_manifest_tamper(
+        tmp_path,
+        lambda manifest: manifest["metrics"][model]["validation"].__setitem__("micro_f1", 0.0),
+    )
+    with pytest.raises(ValueError, match="canonical baseline metrics mismatch"):
+        validate_freeze(output=output, canonical=canonical)
+
+
+def test_tampered_comparison_delta_is_rejected(tmp_path):
+    output, canonical = _copy_freeze_for_manifest_tamper(
+        tmp_path,
+        lambda manifest: manifest["comparison_summary"]["validation"]["tcn_minus_lightgbm"].__setitem__("micro_f1", 0.0),
+    )
+    with pytest.raises(ValueError, match="canonical comparison summary mismatch"):
         validate_freeze(output=output, canonical=canonical)
 
 

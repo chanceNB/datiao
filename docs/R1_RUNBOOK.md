@@ -141,11 +141,11 @@ For the semantic-hash and global-validation-BCE correction, see [R1_TASK_R1_09_F
 
 ## R1 Baseline Freeze V1 and R4 handoff
 
-The completed R1 dataset, feature contract, LightGBM baseline, and Pen TCN baseline are recorded in [R1_BASELINE_FREEZE_V1.md](R1_BASELINE_FREEZE_V1.md), with the canonical manifest at `manifests/r1_baseline_freeze_v1.json`. Validate the local materialization before downstream use:
+The completed R1 dataset, feature contract, LightGBM baseline, and Pen TCN baseline are recorded in [R1_BASELINE_FREEZE_V1.md](R1_BASELINE_FREEZE_V1.md), with the canonical manifest at `manifests/r1_baseline_freeze_v1.json` and `freeze_manifest_hash=sha256:9a6705af7d918d5d22cac718adda8efe3341786223042e89bdc6b5dfb9bea5ef`. Validate the local materialization before downstream use:
 
 ```powershell
 $env:PYTHONPATH = "src"
 python -m datiao.r1.freeze.validator
 ```
 
-The read-only builder can recreate the reports from the existing frozen inputs with `python -m datiao.r1.freeze.builder --overwrite`; it does not train or tune a model. R4 experiment rules and immutable inputs are in [R1_TO_R4_EXPERIMENT_HANDOFF.md](R1_TO_R4_EXPERIMENT_HANDOFF.md). The freeze remains synthetic-only and reports complementary baselines without a winner field.
+The read-only builder can recreate the reports from the existing frozen inputs with `python -m datiao.r1.freeze.builder --overwrite`; it does not train or tune a model. The canonical manifest exposes namespaced `metrics.lightgbm` and `metrics.pen_tcn`, exact `comparison_summary` deltas, and compact `causal_diagnostics`. R4 experiment rules and immutable inputs are in [R1_TO_R4_EXPERIMENT_HANDOFF.md](R1_TO_R4_EXPERIMENT_HANDOFF.md). The freeze remains synthetic-only and reports complementary baselines without a winner field.

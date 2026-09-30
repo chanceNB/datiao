@@ -33,6 +33,11 @@ EXPECTED = {
     "tcn_diagnostics": "sha256:9f9cbd8470ddafdef374756c82a0a8f66e6096063bda40a67df11a1c432f1738",
     "tcn_comparison": "sha256:b138884303d4c068edf536055007a298b875d444c3edfdd4575f7de57a10d852",
 }
+
+CAUSAL_LABELS = ("WRITING", "QUESTION_VISIT", "RETURN", "REVISION_CANDIDATE", "PAGE_CHANGE", "UNKNOWN")
+FORBIDDEN_SUMMARY_KEYS = {"winner", "best_model", "preferred_model", "ranking", "rank"}
+
+
 def _read_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -64,6 +69,40 @@ def _target_match(left, right, split):
 
 def _metric_delta(left, right):
     return {key: left[key] - right[key] for key in ("micro_f1", "macro_f1_all_labels", "macro_roc_auc_evaluable_labels")}
+
+
+def _comparison_summary(lightgbm_metrics, tcn_metrics):
+    split_pairs = (("validation", "validation"), ("synthetic_test", "test"))
+    return {
+        manifest_split: {"tcn_minus_lightgbm": _metric_delta(_aggregate(tcn_metrics[metrics_split]), _aggregate(lightgbm_metrics[metrics_split]))}
+        for manifest_split, metrics_split in split_pairs
+    }
+
+
+def _causal_summary(tcn_manifest):
+    comparison = tcn_manifest["comparison"]
+    return {
+        "labels": list(CAUSAL_LABELS),
+        "validation": {
+            "lightgbm": _aggregate(comparison["lightgbm_causal_diagnostics"]["validation"]),
+            "pen_tcn": _aggregate(comparison["causal_diagnostics"]["validation"]),
+        },
+        "synthetic_test": {
+            "lightgbm": _aggregate(comparison["lightgbm_causal_diagnostics"]["test"]),
+            "pen_tcn": _aggregate(comparison["causal_diagnostics"]["test"]),
+        },
+    }
+
+
+def _assert_no_forbidden_summary_keys(value):
+    if isinstance(value, dict):
+        if FORBIDDEN_SUMMARY_KEYS.intersection(value):
+            raise ValueError("freeze summary contains a forbidden winner/ranking field")
+        for child in value.values():
+            _assert_no_forbidden_summary_keys(child)
+    elif isinstance(value, list):
+        for child in value:
+            _assert_no_forbidden_summary_keys(child)
 
 
 def _support_metadata(lightgbm_manifest):
@@ -137,6 +176,7 @@ def build_freeze(dataset, features, lightgbm_run, tcn_run, output, overwrite=Fal
         "causal_diagnostics": {"validation": {"lightgbm": tcn_manifest["comparison"]["lightgbm_causal_diagnostics"]["validation"], "tcn": tcn_manifest["comparison"]["causal_diagnostics"]["validation"]}, "synthetic_test": {"lightgbm": tcn_manifest["comparison"]["lightgbm_causal_diagnostics"]["test"], "tcn": tcn_manifest["comparison"]["causal_diagnostics"]["test"]}},
         "per_label": {"validation": {"lightgbm": lightgbm_metrics["validation"]["per_label"], "tcn": tcn_metrics["validation"]["per_label"]}, "synthetic_test": {"lightgbm": lightgbm_metrics["test"]["per_label"], "tcn": tcn_metrics["test"]["per_label"]}},
     }
+    _assert_no_forbidden_summary_keys(comparison)
     write_json(output / "baseline_comparison.json", comparison)
 
     limitations = {
@@ -162,7 +202,12 @@ def build_freeze(dataset, features, lightgbm_run, tcn_run, output, overwrite=Fal
         "feature_dataset": {"id": feature_manifest["feature_dataset_id"], "version": feature_manifest["feature_dataset_version"], "manifest_hash": feature_manifest["manifest_hash"], "source_dataset_manifest_hash": feature_manifest["source_dataset_manifest_hash"], "source_split_manifest_hash": feature_manifest["source_split_manifest_hash"], "feature_order": feature_manifest["feature_order"], "label_order": feature_manifest["label_order"], "episodes": feature_manifest["episode_count"], "sequences": feature_manifest["sequence_count"], "split_counts": feature_manifest["split_counts"]},
         "lightgbm": {"baseline_id": lightgbm_manifest["baseline_id"], "version": lightgbm_manifest["baseline_version"], "run_hash": lightgbm_manifest["run_hash"], "predictions_hash": lightgbm_manifest["predictions_hash"], "metrics_hash": lightgbm_manifest["metrics_hash"]},
         "pen_tcn": {"baseline_id": tcn_manifest["baseline_id"], "version": tcn_manifest["baseline_version"], "semantic_run_hash": tcn_manifest["run_hash"], "manifest_integrity_hash": tcn_manifest["manifest_integrity_hash"], "model_state_hash": tcn_manifest["model_state_hash"], "model_file_hash": tcn_manifest["model_file_hash"], "normalization_hash": tcn_manifest["normalization_hash"], "predictions_hash": tcn_manifest["predictions_hash"], "metrics_hash": tcn_manifest["metrics_hash"], "diagnostics_hash": tcn_manifest["causal_diagnostics_hash"], "comparison_hash": tcn_manifest["comparison_hash"]},
-        "metrics": {"validation": _aggregate(tcn_metrics["validation"]), "synthetic_test": _aggregate(tcn_metrics["test"])},
+        "metrics": {
+            "lightgbm": {"validation": _aggregate(lightgbm_metrics["validation"]), "synthetic_test": _aggregate(lightgbm_metrics["test"])},
+            "pen_tcn": {"validation": _aggregate(tcn_metrics["validation"]), "synthetic_test": _aggregate(tcn_metrics["test"])},
+        },
+        "comparison_summary": _comparison_summary(lightgbm_metrics, tcn_metrics),
+        "causal_diagnostics": _causal_summary(tcn_manifest),
         "support_metadata": _support_metadata(lightgbm_manifest),
         "target_causality": _read_json(Path(tcn_run) / "target_causality_audit.json"),
         "temporal_context": _read_json(Path(tcn_run) / "sequence_length_audit.json"),
