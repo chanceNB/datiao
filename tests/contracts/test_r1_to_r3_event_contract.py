@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, RefResolver
 from pydantic import ValidationError
 
 from datiao.r1.integration.r3 import (
@@ -11,8 +11,12 @@ from datiao.r1.integration.r3 import (
     R1R3EventV01,
     export_batch_to_r3,
     export_event_to_r3,
+    export_process_result_to_r3,
 )
 from datiao.r1.models import StudentProcessEvent
+from datiao.r1.models.legacy import legacy_rectangle
+from datiao.r1.pipeline import run_r1_pipeline
+from datiao.r1.synthetic import Scenario, generate_synthetic_case
 from datiao.r1.synthetic import Scenario, generate_synthetic_case
 
 
@@ -159,3 +163,132 @@ def test_golden_schema_is_strict_draft_2020_12():
     golden = json.loads(golden_path.read_text(encoding="utf-8"))
     errors = sorted(Draft202012Validator(schema).iter_errors(golden), key=str)
     assert not errors, [error.message for error in errors]
+
+
+def test_event_dto_enforces_time_and_valid_time_gates():
+    with pytest.raises(ValidationError):
+        R1R3EventV01(**{**export(make_event()).model_dump(), "start_time_ms": None})
+    with pytest.raises(ValidationError):
+        R1R3EventV01(**{**export(make_event()).model_dump(), "start_time_ms": 200, "end_time_ms": 100})
+
+
+def test_event_dto_rejects_empty_refs_and_unversioned_algorithm():
+    with pytest.raises(ValidationError):
+        R1R3EventV01(**{**export(make_event()).model_dump(), "point_refs": ("",)})
+    with pytest.raises(ValidationError):
+        R1R3EventV01(**{**export(make_event()).model_dump(), "algorithm_version": "latest"})
+
+
+def test_event_dto_owns_synthetic_provenance_and_identity_gates():
+    provenance = dict(make_event().provenance)
+    provenance.pop("generator_version")
+    with pytest.raises(ValidationError):
+        R1R3EventV01(**{**export(make_event()).model_dump(), "provenance": provenance})
+    with pytest.raises(ValidationError):
+        R1R3EventV01(**{**export(make_event()).model_dump(), "session_id": "session_001"})
+
+
+def test_batch_dto_self_validates_consistency_and_versions():
+    first = export(make_event(event_id="e-1"))
+    second = export(make_event(event_id="e-2"))
+    base = dict(
+        batch_id="batch-1",
+        session_id=first.session_id,
+        task_segment_id=first.task_segment_id,
+        dataset_version="r1-synthetic-penprocess-v1@1.0.0",
+        algorithm_version=first.algorithm_version,
+        events=(first, second),
+    )
+    assert R1R3EventBatchV01(**base).events
+    with pytest.raises(ValidationError):
+        R1R3EventBatchV01(**{**base, "events": (first.model_copy(update={"session_id": "sim_other"}), second)})
+    with pytest.raises(ValidationError):
+        R1R3EventBatchV01(**{**base, "dataset_version": "current"})
+    with pytest.raises(ValidationError):
+        R1R3EventBatchV01(**{**base, "algorithm_version": "current"})
+    with pytest.raises(ValidationError):
+        R1R3EventBatchV01(**{**base, "events": ()})
+    with pytest.raises(ValidationError):
+        R1R3EventBatchV01(**{**base, "wire_extra": 1})
+
+
+def test_public_pipeline_export_uses_result_context_and_preserves_result():
+    records = (
+        {"point_id": "p-1", "session_id": "s-1", "task_segment_id": "seg-1", "participant_id": "sim-p", "page_id": "p-1", "x": 2.0, "y": 2.0, "timestamp_ms": 1000, "sequence": 0},
+        {"point_id": "p-2", "session_id": "s-1", "task_segment_id": "seg-1", "participant_id": "sim-p", "page_id": "p-1", "x": 3.0, "y": 3.0, "timestamp_ms": 1050, "sequence": 1},
+    )
+    region = legacy_rectangle(region_id="r-q1", page_id="p-1", question_id="q1", x=0.0, y=0.0, width=20.0, height=20.0)
+    result = run_r1_pipeline(records, (region,), "s-1", task_segment_id="seg-1", data_version="points-v1")
+    before = result.model_dump(mode="json")
+    batch = export_process_result_to_r3(result, batch_id="batch-1", dataset_version="points-v1")
+    assert batch.session_id == result.session_id
+    assert batch.task_segment_id == result.task_segment_id
+    assert result.model_dump(mode="json") == before
+    with pytest.raises(ValueError, match="data_version"):
+        export_process_result_to_r3(result, batch_id="batch-1", dataset_version="other")
+
+
+def test_golden_batch_validates_as_schema_and_dto():
+    schema_path = Path("contracts/r1_to_r3_event_batch_v0_1.schema.json").resolve()
+    golden_path = Path("contracts/golden/r1_to_r3_event_batch_v0_1.json")
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    golden = json.loads(golden_path.read_text(encoding="utf-8"))
+    event_schema = json.loads(Path("contracts/r1_to_r3_event_v0_1.schema.json").read_text(encoding="utf-8"))
+    resolver = RefResolver(
+        schema_path.as_uri(),
+        schema,
+        store={event_schema["$id"]: event_schema},
+    )
+    errors = sorted(Draft202012Validator(schema, resolver=resolver).iter_errors(golden), key=str)
+    assert not errors, [error.message for error in errors]
+    assert R1R3EventBatchV01.model_validate_json(golden_path.read_text(encoding="utf-8"))
+
+
+def test_public_pipeline_covers_required_four_synthetic_scenarios():
+    for scenario_type, expected in (
+        ("return_visit", "RETURN"),
+        ("unknown_region", "UNKNOWN"),
+        ("revision_candidate", "REVISION_CANDIDATE"),
+        ("explicit_process_end", "PROCESS_END"),
+    ):
+        case = generate_synthetic_case(Scenario(f"sim_{scenario_type}_public", scenario_type, 20260929))
+        records = tuple(
+            {
+                "point_id": point.point_id,
+                "session_id": point.session_id,
+                "participant_id": point.participant_id,
+                "task_segment_id": point.task_segment_id,
+                "page_id": point.page_id,
+                "x": point.x_raw,
+                "y": point.y_raw,
+                "x_norm": point.x_norm,
+                "y_norm": point.y_norm,
+                "timestamp_ms": point.timestamp_ms,
+                "sequence": point.sequence,
+            }
+            for point in case.raw_points
+        )
+        provenance = {
+            "dataset_type": "synthetic",
+            "generator_version": case.scenario.generator_version,
+            "seed": case.scenario.seed,
+            "scenario_id": case.scenario.scenario_id,
+            "ground_truth_source": "scenario_plan",
+            "manifest_hash": case.manifest.raw_records_hash,
+        }
+        result = run_r1_pipeline(
+            records,
+            case.regions,
+            case.raw_points[0].session_id,
+            task_segment_id=case.raw_points[0].task_segment_id,
+            source_provenance=provenance,
+            process_end_signal=scenario_type == "explicit_process_end",
+        )
+        before = result.model_dump(mode="json")
+        batch = export_process_result_to_r3(
+            result,
+            batch_id=f"batch_{scenario_type}",
+            dataset_version="r1-synthetic-penprocess-v1@1.0.0",
+        )
+        assert any(event.event_type == expected for event in batch.events)
+        assert result.model_dump(mode="json") == before

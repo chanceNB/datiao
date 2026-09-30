@@ -11,5 +11,9 @@
 - [x] VALID, DEGRADED, and INVALID quality statuses are preserved.
 - [x] Batch session, task segment, and algorithm versions are consistent.
 - [x] Strict Draft 2020-12 schema validation passes for the golden event.
+- [x] Event DTO semantic gates enforce time ordering, VALID timestamps, provenance, identity, and concrete versions.
+- [x] Batch DTO validates non-empty input and session, task segment, algorithm, dataset, and version consistency.
+- [x] Batch Draft 2020-12 schema and version-controlled golden validate through a local `$ref` resolver.
+- [x] Public `run_r1_pipeline` result handoff covers RETURN, UNKNOWN, REVISION_CANDIDATE, and PROCESS_END.
 - [x] R1 Core Event and R3 transport payload remain separate.
 - [ ] Live R1↔R3 integration acceptance by R3.

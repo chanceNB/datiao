@@ -32,6 +32,37 @@
     "stroke_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "quality_status": {"enum": ["VALID", "DEGRADED", "INVALID"]},
     "algorithm_version": {"type": "string", "minLength": 1},
-    "provenance": {"type": "object"}
-  }
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "dataset_type": {"type": "string"},
+        "generator_version": {"type": "string", "minLength": 1},
+        "seed": {"type": "integer"},
+        "scenario_id": {"type": "string", "minLength": 1},
+        "ground_truth_source": {"type": "string", "minLength": 1},
+        "manifest_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"quality_status": {"const": "VALID"}}, "required": ["quality_status"]},
+      "then": {
+        "properties": {
+          "start_time_ms": {"type": "integer"},
+          "end_time_ms": {"type": "integer"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"provenance": {"properties": {"dataset_type": {"const": "synthetic"}}}}, "required": ["provenance"]},
+      "then": {
+        "properties": {
+          "provenance": {
+            "required": ["dataset_type", "generator_version", "seed", "scenario_id", "ground_truth_source", "manifest_hash"]
+          }
+        }
+      }
+    }
+  ]
 }

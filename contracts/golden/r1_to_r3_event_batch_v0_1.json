@@ -1,0 +1,226 @@
+{
+  "contract_version": "r1-event-batch-v0.1",
+  "batch_id": "sim_batch_return_q5_001",
+  "session_id": "sim_session_sim_return_q5_001",
+  "task_segment_id": "sim_segment_practice_01",
+  "dataset_version": "r1-synthetic-penprocess-v1@1.0.0",
+  "algorithm_version": "r1-event-rule-v0.2.2",
+  "events": [
+    {
+      "event_id": "sim_session_sim_return_q5_001:event:0000",
+      "event_type": "WRITING",
+      "session_id": "sim_session_sim_return_q5_001",
+      "task_segment_id": "sim_segment_practice_01",
+      "participant_id": "sim_p_001",
+      "question_id": "q-01",
+      "start_time_ms": 0,
+      "end_time_ms": 50,
+      "point_refs": [
+        "sim_sim_return_q5_001_point_000",
+        "sim_sim_return_q5_001_point_001"
+      ],
+      "stroke_refs": [
+        "stroke-0000"
+      ],
+      "quality_status": "VALID",
+      "algorithm_version": "r1-event-rule-v0.2.2",
+      "provenance": {
+        "dataset_type": "synthetic",
+        "generator_version": "r1.synthetic.v1",
+        "seed": 20260929,
+        "scenario_id": "sim_return_q5_001",
+        "ground_truth_source": "scenario_plan",
+        "manifest_hash": "sha256:640008ee1cd164f7f2d7f6adf51f619cd2d8c088299f7088023ddc788473d1fe"
+      }
+    },
+    {
+      "event_id": "sim_session_sim_return_q5_001:event:0001",
+      "event_type": "QUESTION_VISIT",
+      "session_id": "sim_session_sim_return_q5_001",
+      "task_segment_id": "sim_segment_practice_01",
+      "participant_id": "sim_p_001",
+      "question_id": "q-01",
+      "start_time_ms": 0,
+      "end_time_ms": 50,
+      "point_refs": [
+        "sim_sim_return_q5_001_point_000",
+        "sim_sim_return_q5_001_point_001"
+      ],
+      "stroke_refs": [
+        "stroke-0000"
+      ],
+      "quality_status": "VALID",
+      "algorithm_version": "r1-event-rule-v0.2.2",
+      "provenance": {
+        "dataset_type": "synthetic",
+        "generator_version": "r1.synthetic.v1",
+        "seed": 20260929,
+        "scenario_id": "sim_return_q5_001",
+        "ground_truth_source": "scenario_plan",
+        "manifest_hash": "sha256:640008ee1cd164f7f2d7f6adf51f619cd2d8c088299f7088023ddc788473d1fe"
+      }
+    },
+    {
+      "event_id": "sim_session_sim_return_q5_001:event:0002",
+      "event_type": "WRITING",
+      "session_id": "sim_session_sim_return_q5_001",
+      "task_segment_id": "sim_segment_practice_01",
+      "participant_id": "sim_p_001",
+      "question_id": "q-02",
+      "start_time_ms": 2000,
+      "end_time_ms": 2050,
+      "point_refs": [
+        "sim_sim_return_q5_001_point_002",
+        "sim_sim_return_q5_001_point_003"
+      ],
+      "stroke_refs": [
+        "stroke-0001"
+      ],
+      "quality_status": "VALID",
+      "algorithm_version": "r1-event-rule-v0.2.2",
+      "provenance": {
+        "dataset_type": "synthetic",
+        "generator_version": "r1.synthetic.v1",
+        "seed": 20260929,
+        "scenario_id": "sim_return_q5_001",
+        "ground_truth_source": "scenario_plan",
+        "manifest_hash": "sha256:640008ee1cd164f7f2d7f6adf51f619cd2d8c088299f7088023ddc788473d1fe"
+      }
+    },
+    {
+      "event_id": "sim_session_sim_return_q5_001:event:0003",
+      "event_type": "QUESTION_LEAVE",
+      "session_id": "sim_session_sim_return_q5_001",
+      "task_segment_id": "sim_segment_practice_01",
+      "participant_id": "sim_p_001",
+      "question_id": "q-01",
+      "start_time_ms": 50,
+      "end_time_ms": 50,
+      "point_refs": [
+        "sim_sim_return_q5_001_point_000",
+        "sim_sim_return_q5_001_point_001"
+      ],
+      "stroke_refs": [
+        "stroke-0000"
+      ],
+      "quality_status": "VALID",
+      "algorithm_version": "r1-event-rule-v0.2.2",
+      "provenance": {
+        "dataset_type": "synthetic",
+        "generator_version": "r1.synthetic.v1",
+        "seed": 20260929,
+        "scenario_id": "sim_return_q5_001",
+        "ground_truth_source": "scenario_plan",
+        "manifest_hash": "sha256:640008ee1cd164f7f2d7f6adf51f619cd2d8c088299f7088023ddc788473d1fe"
+      }
+    },
+    {
+      "event_id": "sim_session_sim_return_q5_001:event:0004",
+      "event_type": "QUESTION_VISIT",
+      "session_id": "sim_session_sim_return_q5_001",
+      "task_segment_id": "sim_segment_practice_01",
+      "participant_id": "sim_p_001",
+      "question_id": "q-02",
+      "start_time_ms": 2000,
+      "end_time_ms": 2050,
+      "point_refs": [
+        "sim_sim_return_q5_001_point_002",
+        "sim_sim_return_q5_001_point_003"
+      ],
+      "stroke_refs": [
+        "stroke-0001"
+      ],
+      "quality_status": "VALID",
+      "algorithm_version": "r1-event-rule-v0.2.2",
+      "provenance": {
+        "dataset_type": "synthetic",
+        "generator_version": "r1.synthetic.v1",
+        "seed": 20260929,
+        "scenario_id": "sim_return_q5_001",
+        "ground_truth_source": "scenario_plan",
+        "manifest_hash": "sha256:640008ee1cd164f7f2d7f6adf51f619cd2d8c088299f7088023ddc788473d1fe"
+      }
+    },
+    {
+      "event_id": "sim_session_sim_return_q5_001:event:0005",
+      "event_type": "WRITING",
+      "session_id": "sim_session_sim_return_q5_001",
+      "task_segment_id": "sim_segment_practice_01",
+      "participant_id": "sim_p_001",
+      "question_id": "q-01",
+      "start_time_ms": 4000,
+      "end_time_ms": 4050,
+      "point_refs": [
+        "sim_sim_return_q5_001_point_004",
+        "sim_sim_return_q5_001_point_005"
+      ],
+      "stroke_refs": [
+        "stroke-0002"
+      ],
+      "quality_status": "VALID",
+      "algorithm_version": "r1-event-rule-v0.2.2",
+      "provenance": {
+        "dataset_type": "synthetic",
+        "generator_version": "r1.synthetic.v1",
+        "seed": 20260929,
+        "scenario_id": "sim_return_q5_001",
+        "ground_truth_source": "scenario_plan",
+        "manifest_hash": "sha256:640008ee1cd164f7f2d7f6adf51f619cd2d8c088299f7088023ddc788473d1fe"
+      }
+    },
+    {
+      "event_id": "sim_session_sim_return_q5_001:event:0006",
+      "event_type": "QUESTION_LEAVE",
+      "session_id": "sim_session_sim_return_q5_001",
+      "task_segment_id": "sim_segment_practice_01",
+      "participant_id": "sim_p_001",
+      "question_id": "q-02",
+      "start_time_ms": 2050,
+      "end_time_ms": 2050,
+      "point_refs": [
+        "sim_sim_return_q5_001_point_002",
+        "sim_sim_return_q5_001_point_003"
+      ],
+      "stroke_refs": [
+        "stroke-0001"
+      ],
+      "quality_status": "VALID",
+      "algorithm_version": "r1-event-rule-v0.2.2",
+      "provenance": {
+        "dataset_type": "synthetic",
+        "generator_version": "r1.synthetic.v1",
+        "seed": 20260929,
+        "scenario_id": "sim_return_q5_001",
+        "ground_truth_source": "scenario_plan",
+        "manifest_hash": "sha256:640008ee1cd164f7f2d7f6adf51f619cd2d8c088299f7088023ddc788473d1fe"
+      }
+    },
+    {
+      "event_id": "sim_session_sim_return_q5_001:event:0007",
+      "event_type": "RETURN",
+      "session_id": "sim_session_sim_return_q5_001",
+      "task_segment_id": "sim_segment_practice_01",
+      "participant_id": "sim_p_001",
+      "question_id": "q-01",
+      "start_time_ms": 4000,
+      "end_time_ms": 4050,
+      "point_refs": [
+        "sim_sim_return_q5_001_point_004",
+        "sim_sim_return_q5_001_point_005"
+      ],
+      "stroke_refs": [
+        "stroke-0002"
+      ],
+      "quality_status": "VALID",
+      "algorithm_version": "r1-event-rule-v0.2.2",
+      "provenance": {
+        "dataset_type": "synthetic",
+        "generator_version": "r1.synthetic.v1",
+        "seed": 20260929,
+        "scenario_id": "sim_return_q5_001",
+        "ground_truth_source": "scenario_plan",
+        "manifest_hash": "sha256:640008ee1cd164f7f2d7f6adf51f619cd2d8c088299f7088023ddc788473d1fe"
+      }
+    }
+  ]
+}

@@ -30,9 +30,19 @@ The existing R1 core contract and `contracts/golden/r1_event_example.json` remai
 - `PROCESS_END` is propagated only when R1 emitted it from an explicit end signal or configured timeout. The Adapter never creates one from EOF, idle time, or missing points.
 - `UNKNOWN` preserves an untrusted mapping and `"UNKNOWN"` question ID.
 
+## Structural and semantic gates
+
+The Event JSON Schema is the structural gate. `R1R3EventV01` is the semantic gate for time ordering, VALID timestamps, non-empty refs, synthetic provenance and IDs, and concrete algorithm versions. External point and stroke existence remains an exporter gate.
+
+The Batch JSON Schema is `contracts/r1_to_r3_event_batch_v0_1.schema.json`. `R1R3EventBatchV01` repeats the semantic gate for non-empty batches, session, task segment and algorithm consistency, and concrete dataset and algorithm versions.
+
 ## Batch consistency
 
 `export_batch_to_r3` requires a caller supplied `batch_id` and `dataset_version`. Every event in the batch must share `session_id`, `task_segment_id`, and `algorithm_version`; a mismatch fails export. Child event values are never overwritten.
+
+## Public pipeline handoff
+
+`export_process_result_to_r3(result, batch_id=..., dataset_version=...)` is the public offline handoff. It consumes `R1ProcessResult.student_process_events`, `points`, and `strokes`, checks the Result session, task segment, and optional `data_version`, then delegates to the existing batch exporter. It does not implement HTTP or network I/O.
 
 ## Golden payloads
 
@@ -40,3 +50,5 @@ The existing R1 core contract and `contracts/golden/r1_event_example.json` remai
 - Handoff copy: `artifacts/r1_r3_integration_v0_1/single_event_golden.json`
 - Batch handoff copy: `artifacts/r1_r3_integration_v0_1/batch_golden.json`
 - Schema: `contracts/r1_to_r3_event_v0_1.schema.json`
+- Batch schema: `contracts/r1_to_r3_event_batch_v0_1.schema.json`
+- Version-controlled batch golden: `contracts/golden/r1_to_r3_event_batch_v0_1.json`
